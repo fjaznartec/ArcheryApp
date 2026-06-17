@@ -1,0 +1,6 @@
+{
+  "name": "ArcheryApp",
+  "description": "Plataforma integral de gestión de entrenamientos y arqueros de Tiro con Arco con Diana Interactiva, Contador de Flechas y Dashboards por Roles.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
