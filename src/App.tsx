@@ -5,6 +5,7 @@ import AdminDashboard from './components/AdminDashboard';
 import TecnicoDashboard from './components/TecnicoDashboard';
 import ArqueroDashboard from './components/ArqueroDashboard';
 import { Target, Users, ShieldAlert, Award, FileText, Database } from 'lucide-react';
+import SupabaseSyncPanel from './components/SupabaseSyncPanel';
 
 export default function App() {
   // --- STATE BASE DE DATOS MOCK PERSISTIDO ---
@@ -21,6 +22,7 @@ export default function App() {
 
   // --- SESIÓN Y NAVEGACIÓN ---
   const [usuarioLogueado, setUsuarioLogueado] = useState<Usuario | null>(null);
+  const [showSupabasePanel, setShowSupabasePanel] = useState<boolean>(true);
 
   // --- INICIALIZADOR DE SEMILLA DE DATOS (SEED) ---
   useEffect(() => {
@@ -648,6 +650,35 @@ export default function App() {
     setUsuarioLogueado(null);
   };
 
+  const handleSyncDataRetrieved = (data: {
+    usuarios?: Usuario[];
+    setups?: SetupRutina[];
+    diarios?: DiarioEntrada[];
+    controles?: ControlTiro[];
+    noticias?: any[];
+  }) => {
+    if (data.usuarios && data.usuarios.length > 0) {
+      setUsuarios(data.usuarios);
+      localStorage.setItem('archery_usuarios', JSON.stringify(data.usuarios));
+    }
+    if (data.setups && data.setups.length > 0) {
+      setSetups(data.setups);
+      localStorage.setItem('archery_setups', JSON.stringify(data.setups));
+    }
+    if (data.diarios && data.diarios.length > 0) {
+      setDiarios(data.diarios);
+      localStorage.setItem('archery_diarios', JSON.stringify(data.diarios));
+    }
+    if (data.controles && data.controles.length > 0) {
+      setControles(data.controles);
+      localStorage.setItem('archery_controles', JSON.stringify(data.controles));
+    }
+    if (data.noticias && data.noticias.length > 0) {
+      setNoticias(data.noticias);
+      localStorage.setItem('archery_noticias', JSON.stringify(data.noticias));
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans select-none">
       
@@ -786,6 +817,47 @@ export default function App() {
           />
         )}
       </div>
+
+      {usuarioLogueado && showSupabasePanel && (
+        <div className="bg-slate-55 border-t border-slate-200 px-4 py-4 shrink-0 shadow-inner">
+          <div className="max-w-7xl mx-auto flex justify-between items-center mb-1 px-4">
+            <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1.5 uppercase tracking-wide">
+              🔌 Integración Remota de Base de Datos
+            </span>
+            <button 
+              onClick={() => setShowSupabasePanel(false)}
+              className="text-[10px] font-extrabold text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100/60 px-2.5 py-1 rounded border border-rose-200 transition uppercase cursor-pointer"
+            >
+              Hé Ocultar Panel de Sincronización
+            </button>
+          </div>
+          <SupabaseSyncPanel 
+            usuarios={usuarios}
+            noticias={noticias}
+            grupos={grupos}
+            miembros={miembros}
+            planificaciones={planificaciones}
+            ejercicios={ejercicios}
+            sesiones={sesiones}
+            diarios={diarios}
+            controles={controles}
+            setups={setups}
+            onSyncDataRetrieved={handleSyncDataRetrieved}
+          />
+        </div>
+      )}
+
+      {usuarioLogueado && !showSupabasePanel && (
+        <div className="bg-slate-100 border-t border-slate-200 px-6 py-2.5 flex justify-between items-center text-xs text-slate-500 font-semibold shadow-xs">
+          <span>Base de datos en la nube de Supabase configurada con éxito.</span>
+          <button 
+            onClick={() => setShowSupabasePanel(true)}
+            className="px-3 py-1 bg-indigo-50 hover:bg-indigo-100/80 text-indigo-700 font-extrabold text-[10px] rounded border border-indigo-200 uppercase transition tracking-wide cursor-pointer animate-pulse"
+          >
+            Mostrar Panel de Sincronización Supabase
+          </button>
+        </div>
+      )}
 
     </div>
   );
