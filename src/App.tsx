@@ -656,6 +656,7 @@ export default function App() {
     diarios?: DiarioEntrada[];
     controles?: ControlTiro[];
     noticias?: any[];
+    sesiones?: Sesion[];
   }) => {
     if (data.usuarios && data.usuarios.length > 0) {
       setUsuarios(data.usuarios);
@@ -676,6 +677,10 @@ export default function App() {
     if (data.noticias && data.noticias.length > 0) {
       setNoticias(data.noticias);
       localStorage.setItem('archery_noticias', JSON.stringify(data.noticias));
+    }
+    if (data.sesiones && data.sesiones.length > 0) {
+      setSesiones(data.sesiones);
+      localStorage.setItem('archery_sesiones_entrenamiento', JSON.stringify(data.sesiones));
     }
   };
 

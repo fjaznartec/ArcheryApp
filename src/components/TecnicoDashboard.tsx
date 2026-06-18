@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Usuario, GrupoEntrenamiento, MiembroGrupo, Planificacion, Sesion, Ejercicio, PlanificacionTipo, EjercicioTipo, EjercicioDificultad, DiarioEntrada, ControlTiro, SetupRutina, MesocicloPlan, MicrocicloPlan, CompeticionPlaneada } from '../types';
-import { Users, Calendar, Target, FileText, TrendingUp, Sparkles, Plus, Eye, CheckCircle, BarChart2, Trash2, BookOpen, ArrowLeft, Sliders, MessageSquare, Check, UserPlus, Pencil, X, Search, Trophy, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Users, Calendar, Target, FileText, TrendingUp, Sparkles, Plus, Eye, CheckCircle, BarChart2, Trash2, BookOpen, ArrowLeft, Sliders, MessageSquare, Check, UserPlus, Pencil, X, Search, Trophy, ChevronLeft, ChevronRight, Printer } from 'lucide-react';
+import { generateSessionPDF } from '../lib/pdfGenerator';
 
 interface TecnicoDashboardProps {
   usuarioActual: Usuario;
@@ -166,9 +167,36 @@ export default function TecnicoDashboard({
   const [ejDificultad, setEjDificultad] = useState<EjercicioDificultad>('Media');
   const [ejIntensidadFlechas, setEjIntensidadFlechas] = useState(72);
 
+  // Filtros de Tipo de Ejercicio
+  const [filterEjerciciosBancoTipo, setFilterEjerciciosBancoTipo] = useState<string>('Todos');
+  const [filterEjerciciosProgramarTipo, setFilterEjerciciosProgramarTipo] = useState<string>('Todos');
+
   // Sesiones de Entrenamiento form
   const [sesTitulo, setSesTitulo] = useState('');
-  const [tiposEntrenamiento, setTiposEntrenamiento] = useState<string[]>(['Técnico', 'Físico', 'Psicológico']);
+  const [tiposEntrenamiento, setTiposEntrenamiento] = useState<string[]>(() => {
+    const defaultTypes = ['Técnico', 'Físico', 'Psicológico'];
+    try {
+      const saved = localStorage.getItem('archery_tipos_entrenamiento');
+      const parsed = saved ? JSON.parse(saved) : [];
+      return Array.from(new Set([...defaultTypes, ...parsed]));
+    } catch (e) {
+      return defaultTypes;
+    }
+  });
+
+  React.useEffect(() => {
+    const defaultTypes = ['Técnico', 'Físico', 'Psicológico'];
+    try {
+      const saved = localStorage.getItem('archery_tipos_entrenamiento');
+      const parsed = saved ? JSON.parse(saved) : [];
+      const sessionTypes = sesionesList.map(s => s.tipo_entrenamiento).filter(Boolean);
+      const combined = Array.from(new Set([...defaultTypes, ...parsed, ...sessionTypes]));
+      setTiposEntrenamiento(combined);
+    } catch (e) {
+      // safe fallback
+    }
+  }, [sesionesList]);
+
   const [sesTipo, setSesTipo] = useState('Técnico');
   const [nuevoTipoEntrenamiento, setNuevoTipoEntrenamiento] = useState('');
   const [sesFecha, setSesFecha] = useState('2026-06-15');
@@ -731,10 +759,28 @@ export default function TecnicoDashboard({
     if (nuevoTipoEntrenamiento.trim()) {
       const limpio = nuevoTipoEntrenamiento.trim();
       if (!tiposEntrenamiento.includes(limpio)) {
-        setTiposEntrenamiento([...tiposEntrenamiento, limpio]);
+        const nuevosTipos = [...tiposEntrenamiento, limpio];
+        setTiposEntrenamiento(nuevosTipos);
+        const defaultTypes = ['Técnico', 'Físico', 'Psicológico'];
+        const customOnly = nuevosTipos.filter(t => !defaultTypes.includes(t));
+        localStorage.setItem('archery_tipos_entrenamiento', JSON.stringify(customOnly));
+        setSesTipo(limpio);
+      } else {
         setSesTipo(limpio);
       }
       setNuevoTipoEntrenamiento('');
+    }
+  };
+
+  const handleEliminarTipoEntrenamiento = (tipoAEliminar: string) => {
+    const defaultTypes = ['Técnico', 'Físico', 'Psicológico'];
+    if (defaultTypes.includes(tipoAEliminar)) return;
+    const nuevosTipos = tiposEntrenamiento.filter(t => t !== tipoAEliminar);
+    setTiposEntrenamiento(nuevosTipos);
+    const customOnly = nuevosTipos.filter(t => !defaultTypes.includes(t));
+    localStorage.setItem('archery_tipos_entrenamiento', JSON.stringify(customOnly));
+    if (sesTipo === tipoAEliminar) {
+      setSesTipo('Técnico');
     }
   };
 
@@ -2517,11 +2563,36 @@ export default function TecnicoDashboard({
                         <button
                           type="button"
                           onClick={handleAgregarTipoEntrenamiento}
-                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[10px] font-bold uppercase tracking-wider transition"
+                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[10px] font-bold uppercase tracking-wider transition cursor-pointer"
                         >
                           Añadir
                         </button>
                       </div>
+
+                      {/* List of custom training types */}
+                      {tiposEntrenamiento.some(t => !['Técnico', 'Físico', 'Psicológico'].includes(t)) && (
+                        <div className="pt-2 border-t border-slate-200/50">
+                          <span className="block text-[8px] font-extrabold text-slate-400 uppercase mb-1">Tipos personalizados creados:</span>
+                          <div className="flex flex-wrap gap-1">
+                            {tiposEntrenamiento
+                              .filter(t => !['Técnico', 'Físico', 'Psicológico'].includes(t))
+                              .map(t => (
+                                <span key={t} className="inline-flex items-center gap-1.5 bg-white border border-slate-200 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded-full shadow-2xs">
+                                  <span>{t}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleEliminarTipoEntrenamiento(t)}
+                                    className="text-slate-400 hover:text-red-500 transition-colors focus:outline-none cursor-pointer p-0.5"
+                                    title="Eliminar este tipo personalizado"
+                                  >
+                                    <X size={10} />
+                                  </button>
+                                </span>
+                              ))
+                            }
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div className="p-3 bg-indigo-50/50 border border-indigo-100 rounded-lg space-y-3">
@@ -2600,36 +2671,64 @@ export default function TecnicoDashboard({
                           </span>
                         )}
                       </div>
+                      {ejerciciosList.length > 0 && (
+                        <div className="flex items-center gap-2 mb-2 p-1.5 bg-slate-100 rounded-lg">
+                          <span className="text-[9px] font-extrabold text-slate-500 uppercase">Filtrar por Tipo:</span>
+                          <select
+                            value={filterEjerciciosProgramarTipo}
+                            onChange={(e) => setFilterEjerciciosProgramarTipo(e.target.value)}
+                            className="text-[11px] bg-white border border-slate-200 rounded px-2 py-0.5 text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-medium cursor-pointer"
+                          >
+                            <option value="Todos">Todos los tipos</option>
+                            <option value="Técnica">Técnica</option>
+                            <option value="Fuerza">Fuerza</option>
+                            <option value="Variabilidad">Variabilidad</option>
+                            <option value="Estiramientos">Estiramientos</option>
+                            <option value="Iniciación">Iniciación</option>
+                            <option value="Ajuste (Estabilidad)">Ajuste (Estabilidad)</option>
+                            <option value="Carga (Fuerza, Técnica)">Carga (Fuerza, Técnica)</option>
+                            <option value="Activación">Activación</option>
+                            <option value="Precompetición">Precompetición</option>
+                            <option value="Competición">Competición</option>
+                          </select>
+                        </div>
+                      )}
                       {ejerciciosList.length === 0 ? (
                         <p className="text-xs text-slate-400 italic bg-slate-50 border p-3 rounded-lg">No hay ejercicios homologados guardados. Ve al Banco de Ejercicios primero.</p>
                       ) : (
                         <div className="space-y-1.5 max-h-[160px] overflow-y-auto border border-slate-200 p-2 rounded-lg bg-slate-50">
-                          {ejerciciosList.map(e => {
-                            const seleccionado = sesEjerciciosIds.includes(e.id);
-                            return (
-                              <div 
-                                key={e.id}
-                                onClick={() => handleToggleEjercicioEnSesion(e.id)}
-                                className={`p-2 rounded-md border text-xs cursor-pointer transition flex items-center justify-between ${
-                                  seleccionado 
-                                    ? 'bg-indigo-50 border-indigo-400 text-indigo-900 font-bold' 
-                                    : 'bg-white border-slate-150 text-slate-655'
-                                }`}
-                              >
-                                <div className="space-y-0.5">
-                                  <span>{e.nombre}</span>
-                                  <span className="block text-[9px] text-slate-500 font-mono font-medium">{e.tipo_ejercicio} • {e.duracion} min</span>
-                                </div>
-                                <div className="shrink-0">
-                                  {seleccionado ? (
-                                    <span className="text-[10px] text-indigo-700 bg-indigo-100 p-0.5 px-1.5 rounded-sm font-bold">Agregado</span>
-                                  ) : (
-                                    <span className="text-[10px] text-slate-400">＋ Incluir</span>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
+                          {ejerciciosList.filter(e => filterEjerciciosProgramarTipo === 'Todos' || e.tipo_ejercicio === filterEjerciciosProgramarTipo).length === 0 ? (
+                            <p className="text-[11px] text-slate-400 italic text-center py-5">No hay ejercicios de este tipo en el fichero.</p>
+                          ) : (
+                            ejerciciosList
+                              .filter(e => filterEjerciciosProgramarTipo === 'Todos' || e.tipo_ejercicio === filterEjerciciosProgramarTipo)
+                              .map(e => {
+                                const seleccionado = sesEjerciciosIds.includes(e.id);
+                                return (
+                                  <div 
+                                    key={e.id}
+                                    onClick={() => handleToggleEjercicioEnSesion(e.id)}
+                                    className={`p-2 rounded-md border text-xs cursor-pointer transition flex items-center justify-between ${
+                                      seleccionado 
+                                        ? 'bg-indigo-50 border-indigo-400 text-indigo-900 font-bold' 
+                                        : 'bg-white border-slate-150 text-slate-655'
+                                    }`}
+                                  >
+                                    <div className="space-y-0.5">
+                                      <span>{e.nombre}</span>
+                                      <span className="block text-[9px] text-slate-500 font-mono font-medium">{e.tipo_ejercicio} • {e.duracion} min</span>
+                                    </div>
+                                    <div className="shrink-0">
+                                      {seleccionado ? (
+                                        <span className="text-[10px] text-indigo-700 bg-indigo-100 p-0.5 px-1.5 rounded-sm font-bold">Agregado</span>
+                                      ) : (
+                                        <span className="text-[10px] text-slate-400">＋ Incluir</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })
+                          )}
                         </div>
                       )}
                     </div>
@@ -2691,6 +2790,13 @@ export default function TecnicoDashboard({
                         return (
                           <div key={s.id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl relative hover:border-indigo-200 transition space-y-3">
                             <div className="absolute top-4 right-4 flex items-center gap-2">
+                              <button
+                                onClick={() => generateSessionPDF(s, ejerciciosList, targetText)}
+                                className="text-slate-500 hover:text-indigo-600 bg-white hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 p-1 rounded-md transition shadow-2xs cursor-pointer flex items-center justify-center"
+                                title="Imprimir / Exportar a PDF"
+                              >
+                                <Printer size={13} />
+                              </button>
                               <button
                                 onClick={() => handleEditSesionClick(s)}
                                 className="text-slate-400 hover:text-indigo-600 transition cursor-pointer"
@@ -2760,6 +2866,55 @@ export default function TecnicoDashboard({
                                 })}
                               </div>
                             </div>
+
+                            {/* Mostrar reporte de completitud para entrenadores */}
+                            {(() => {
+                              const completaronUserIds = s.completada_por_arqueros || [];
+                              const ejerciciosCompletadosMap = s.ejercicios_completados_arqueros || {};
+                              const flechasCompletadasMap = s.flechas_completadas_arqueros || {};
+                              
+                              const allArcherIds = Array.from(new Set([
+                                ...completaronUserIds,
+                                ...Object.keys(ejerciciosCompletadosMap),
+                                ...Object.keys(flechasCompletadasMap)
+                              ])).filter(uid => usuariosList.some(u => u.id_usuario === uid));
+                              
+                              if (allArcherIds.length === 0) return null;
+                              
+                              return (
+                                <div className="mt-3 pt-3 border-t border-slate-250 bg-slate-100/50 p-3 rounded-xl space-y-2">
+                                  <p className="text-[10px] uppercase font-extrabold text-slate-500 tracking-wider flex items-center gap-1">
+                                    <span>📈 Control de Avance de Alumnos ({allArcherIds.length})</span>
+                                  </p>
+                                  <div className="space-y-1">
+                                    {allArcherIds.map(uid => {
+                                      const u = usuariosList.find(usr => usr.id_usuario === uid);
+                                      if (!u) return null;
+                                      const archerCompletedSession = completaronUserIds.includes(uid);
+                                      const completedExercises = ejerciciosCompletadosMap[uid] || [];
+                                      const completedArrows = flechasCompletadasMap[uid] ?? 0;
+                                      return (
+                                        <div key={uid} className="flex justify-between items-center text-[11px] bg-white p-2 rounded-lg border border-slate-200">
+                                          <div className="flex items-center gap-1.5 min-w-0">
+                                            <span className={`w-2 h-2 rounded-full shrink-0 ${completedExercises.length === (s.ejercicios_ids?.length || 0) ? 'bg-emerald-500' : 'bg-indigo-400'}`} />
+                                            <span className="font-extrabold text-slate-705 truncate">{u.nombre}</span>
+                                            {archerCompletedSession && (
+                                              <span className="text-[8px] bg-emerald-100 text-emerald-800 font-extrabold px-1.5 py-0.5 rounded uppercase">
+                                                Completada
+                                              </span>
+                                            )}
+                                          </div>
+                                          <div className="shrink-0 flex items-center gap-2.5 font-mono text-[10px] text-slate-500 font-bold">
+                                            <span>ejercicios: {completedExercises.length}/{s.ejercicios_ids?.length || 0}</span>
+                                            <span className="text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded">🏹 {completedArrows} flechas</span>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            })()}
 
                             <div className="flex justify-between items-center pt-2.5 border-t border-slate-200 text-[10px] flex-wrap gap-2">
                               <div className="flex items-center gap-3">
@@ -2915,33 +3070,61 @@ export default function TecnicoDashboard({
 
                 {/* Listado banco de ejercicios */}
                 <div className="lg:col-span-7 bg-white border border-slate-100 p-5 rounded-xl shadow-sm space-y-4">
-                  <h3 className="text-md font-bold text-slate-800">Fichero de Ejercicios Homologados del Club</h3>
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-2 border-b border-slate-100">
+                    <h3 className="text-md font-bold text-slate-800">Fichero de Ejercicios Homologados del Club</h3>
+                    <div className="flex items-center gap-1.5 w-full sm:w-auto">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase shrink-0">Filtrar:</span>
+                      <select
+                        value={filterEjerciciosBancoTipo}
+                        onChange={(e) => setFilterEjerciciosBancoTipo(e.target.value)}
+                        className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-medium w-full sm:w-auto cursor-pointer"
+                      >
+                        <option value="Todos">Todos los tipos</option>
+                        <option value="Técnica">Técnica</option>
+                        <option value="Fuerza">Fuerza</option>
+                        <option value="Variabilidad">Variabilidad</option>
+                        <option value="Estiramientos">Estiramientos</option>
+                        <option value="Iniciación">Iniciación</option>
+                        <option value="Ajuste (Estabilidad)">Ajuste (Estabilidad)</option>
+                        <option value="Carga (Fuerza, Técnica)">Carga (Fuerza, Técnica)</option>
+                        <option value="Activación">Activación</option>
+                        <option value="Precompetición">Precompetición</option>
+                        <option value="Competición">Competición</option>
+                      </select>
+                    </div>
+                  </div>
                   <div className="grid sm:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto pr-1">
-                    {ejerciciosList.map((e) => (
-                      <div key={e.id} className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2 relative group hover:border-slate-300 transition">
-                        <div className="flex justify-between items-start">
-                          <span className="text-[9px] bg-indigo-100 text-indigo-800 font-extrabold px-1.5 py-0.5 rounded uppercase font-mono">
-                            {e.tipo_ejercicio}
-                          </span>
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              onClick={() => handleEditEjercicioClick(e)}
-                              className="text-slate-450 hover:text-indigo-650 transition cursor-pointer p-0.5 rounded hover:bg-slate-200"
-                              title="Editar Ejercicio"
-                            >
-                              <Pencil size={11} />
-                            </button>
-                            <span className="text-[10px] font-bold text-slate-400 font-mono">{e.duracion} min</span>
+                    {ejerciciosList.filter(e => filterEjerciciosBancoTipo === 'Todos' || e.tipo_ejercicio === filterEjerciciosBancoTipo).length === 0 ? (
+                      <p className="text-xs text-slate-400 italic text-center py-12 col-span-2 bg-slate-25 rounded-lg border border-dashed border-slate-200">No hay ejercicios de este tipo en el fichero.</p>
+                    ) : (
+                      ejerciciosList
+                        .filter(e => filterEjerciciosBancoTipo === 'Todos' || e.tipo_ejercicio === filterEjerciciosBancoTipo)
+                        .map((e) => (
+                          <div key={e.id} className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2 relative group hover:border-slate-300 transition">
+                            <div className="flex justify-between items-start">
+                              <span className="text-[9px] bg-indigo-100 text-indigo-800 font-extrabold px-1.5 py-0.5 rounded uppercase font-mono">
+                                {e.tipo_ejercicio}
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  onClick={() => handleEditEjercicioClick(e)}
+                                  className="text-slate-450 hover:text-indigo-650 transition cursor-pointer p-0.5 rounded hover:bg-slate-200"
+                                  title="Editar Ejercicio"
+                                >
+                                  <Pencil size={11} />
+                                </button>
+                                <span className="text-[10px] font-bold text-slate-400 font-mono">{e.duracion} min</span>
+                              </div>
+                            </div>
+                            <h4 className="font-bold text-xs text-slate-800 leading-tight">{e.nombre}</h4>
+                            <p className="text-[11px] text-slate-500 line-clamp-3 leading-normal">{e.descripcion}</p>
+                            <div className="pt-2 border-t border-slate-200 text-[10px] text-slate-450 flex justify-between">
+                              <span>Dificultad: <strong className="font-bold text-slate-700">{e.dificultad}</strong></span>
+                              <span>Volumen: <strong className="font-bold text-slate-700">{e.intensidad_flechas_repeticion} flechas</strong></span>
+                            </div>
                           </div>
-                        </div>
-                        <h4 className="font-bold text-xs text-slate-800 leading-tight">{e.nombre}</h4>
-                        <p className="text-[11px] text-slate-500 line-clamp-3 leading-normal">{e.descripcion}</p>
-                        <div className="pt-2 border-t border-slate-200 text-[10px] text-slate-450 flex justify-between">
-                          <span>Dificultad: <strong className="font-bold text-slate-700">{e.dificultad}</strong></span>
-                          <span>Volumen: <strong className="font-bold text-slate-700">{e.intensidad_flechas_repeticion} flechas</strong></span>
-                        </div>
-                      </div>
-                    ))}
+                        ))
+                    )}
                   </div>
                 </div>
 

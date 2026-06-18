@@ -109,6 +109,8 @@ export interface Sesion {
   comentarios?: string;
   completada?: boolean;
   completada_por_arqueros?: string[]; // IDs of archers who completed this session
+  ejercicios_completados_arqueros?: Record<string, string[]>; // Map of ArcherID -> list of completed Exercise IDs
+  flechas_completadas_arqueros?: Record<string, number>; // Map of ArcherID -> total arrows completed
 }
 
 export type EjercicioTipo =

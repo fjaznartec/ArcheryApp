@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Usuario, GrupoEntrenamiento, MiembroGrupo, Planificacion, Sesion, Ejercicio, DiarioEntrada, DiarioTipoEntrada, DiarioPrivacidad, ControlTiro, ImpactoFlecha, SetupRutina } from '../types';
-import { BookOpen, Target, Compass, Award, Calendar, Settings, Sparkles, Plus, Trash2, Heart, Search, Eye, EyeOff, Check, ExternalLink, Clock, Activity } from 'lucide-react';
+import { BookOpen, Target, Compass, Award, Calendar, Settings, Sparkles, Plus, Trash2, Heart, Search, Eye, EyeOff, Check, ExternalLink, Clock, Activity, Printer } from 'lucide-react';
+import { generateSessionPDF } from '../lib/pdfGenerator';
 import DianaInteractiva from './DianaInteractiva';
 import ContadorFlechas from './ContadorFlechas';
 
@@ -45,6 +46,7 @@ export default function ArqueroDashboard({
 }: ArqueroDashboardProps) {
   const [activeTab, setActiveTab] = useState<'flechas' | 'controles' | 'diario' | 'planes' | 'entrenos' | 'grupos' | 'setups' | 'ianseo'>('flechas');
   const [activeConfigTab, setActiveConfigTab] = useState<'visor' | 'rutinas' | 'objetivo_mental' | 'material'>('visor');
+  const [filtroSesion, setFiltroSesion] = useState<'todos' | 'pendientes' | 'completados'>('todos');
 
   // Diario Form state
   const [diarioTitulo, setDiarioTitulo] = useState('');
@@ -55,9 +57,12 @@ export default function ArqueroDashboard({
   const [diarioPrivacidad, setDiarioPrivacidad] = useState<DiarioPrivacidad>('privada');
   const [diarioCuerpo, setDiarioCuerpo] = useState('');
 
-  // Setup Form state (diferenciados en 3 apartados)
+  // Setup Form state (diferenciados en 4 apartados)
   const [visorDistancia, setVisorDistancia] = useState('70m');
+  const [visorDistanciaOtro, setVisorDistanciaOtro] = useState('');
   const [visorMedida, setVisorMedida] = useState('5.4');
+  const [visorLibras, setVisorLibras] = useState('');
+  const [visorObjetivoMental, setVisorObjetivoMental] = useState('');
 
   const [objetivoMentalText, setObjetivoMentalText] = useState('');
 
@@ -110,7 +115,12 @@ export default function ArqueroDashboard({
   // Handlers para las 3 configuraciones
   const handleSaveVisor = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!visorDistancia || !visorMedida) {
+    const finalDistancia = visorDistancia === 'Otro' ? visorDistanciaOtro.trim() : visorDistancia;
+    if (!finalDistancia) {
+      alert('Por favor especifica la distancia o selecciona una.');
+      return;
+    }
+    if (!visorMedida) {
       alert('Por favor rellena todos los campos requeridos del visor.');
       return;
     }
@@ -121,8 +131,10 @@ export default function ArqueroDashboard({
         id_arquero: usuarioActual.id_usuario,
         tipo: 'setup',
         datos_json: {
-          distancia: visorDistancia,
-          visor: visorMedida
+          distancia: finalDistancia,
+          visor: visorMedida,
+          libras: visorLibras.trim() || undefined,
+          objetivo_mental: visorObjetivoMental.trim() || undefined
         }
       };
       onUpdateSetup?.(updated);
@@ -134,15 +146,20 @@ export default function ArqueroDashboard({
         id_arquero: usuarioActual.id_usuario,
         tipo: 'setup',
         datos_json: {
-          distancia: visorDistancia,
-          visor: visorMedida
+          distancia: finalDistancia,
+          visor: visorMedida,
+          libras: visorLibras.trim() || undefined,
+          objetivo_mental: visorObjetivoMental.trim() || undefined
         }
       };
       onAddSetup(nuevo);
       alert('¡Configuración de visor guardada exitosamente!');
     }
     setVisorDistancia('70m');
+    setVisorDistanciaOtro('');
     setVisorMedida('5.4');
+    setVisorLibras('');
+    setVisorObjetivoMental('');
   };
 
   const handleSaveObjetivoMental = (e: React.FormEvent) => {
@@ -268,8 +285,18 @@ export default function ArqueroDashboard({
   const handleEditClick = (s: SetupRutina) => {
     setEditingSetupId(s.id);
     if (s.tipo === 'setup') {
-      setVisorDistancia(s.datos_json.distancia || '70m');
+      const predefinedDistancias = ['12m', '15m', '18m', '30m', '40m', '50m', '60m', '70m', '90m'];
+      const currentDist = s.datos_json.distancia || '70m';
+      if (predefinedDistancias.includes(currentDist)) {
+        setVisorDistancia(currentDist);
+        setVisorDistanciaOtro('');
+      } else {
+        setVisorDistancia('Otro');
+        setVisorDistanciaOtro(currentDist);
+      }
       setVisorMedida(s.datos_json.visor || '5.4');
+      setVisorLibras(s.datos_json.libras || '');
+      setVisorObjetivoMental(s.datos_json.objetivo_mental || '');
     } else if (s.tipo === 'objetivo_mental') {
       setObjetivoMentalText(s.datos_json.objetivo || '');
     } else if (s.tipo === 'rutina') {
@@ -294,7 +321,10 @@ export default function ArqueroDashboard({
   const handleCancelEdit = () => {
     setEditingSetupId(null);
     setVisorDistancia('70m');
+    setVisorDistanciaOtro('');
     setVisorMedida('5.4');
+    setVisorLibras('');
+    setVisorObjetivoMental('');
     setObjetivoMentalText('');
     setRutinaNombre('');
     setRutinaDescripcion('');
@@ -351,19 +381,60 @@ export default function ArqueroDashboard({
     (p.tipo === 'grupo' && p.id_grupo && misGruposAceptadosIDs.includes(p.id_grupo))
   );
 
-  const misSesiones = (sesionesList || []).filter(s => 
+  const esSesionCompletada = (s: Sesion) => {
+    return (s.completada_por_arqueros || []).includes(usuarioActual.id_usuario);
+  };
+
+  const misSesionesRaw = (sesionesList || []).filter(s => 
     (s.asignado_a === 'arquero' && s.id_arquero === usuarioActual.id_usuario) ||
     (s.asignado_a === 'grupo' && s.id_grupo && misGruposAceptadosIDs.includes(s.id_grupo))
   );
 
-  const esSesionCompletada = (s: Sesion) => {
-    return s.completada || (s.completada_por_arqueros || []).includes(usuarioActual.id_usuario);
-  };
+  const pendingCount = misSesionesRaw.filter(s => !esSesionCompletada(s)).length;
+  const completedCount = misSesionesRaw.filter(s => esSesionCompletada(s)).length;
+  const totalCount = misSesionesRaw.length;
+
+  const misSesiones = misSesionesRaw.filter(s => {
+    if (filtroSesion === 'pendientes') {
+      return !esSesionCompletada(s);
+    }
+    if (filtroSesion === 'completados') {
+      return esSesionCompletada(s);
+    }
+    return true;
+  });
+
+  misSesiones.sort((a, b) => {
+    const da = a.fecha_asignada || '';
+    const db = b.fecha_asignada || '';
+    if (filtroSesion === 'pendientes') {
+      return da.localeCompare(db); // Ascendente
+    } else {
+      return db.localeCompare(da); // Descendente
+    }
+  });
 
   const handleToggleSesionCompletada = (s: Sesion) => {
     if (!onUpdateSesion) return;
     const completas = s.completada_por_arqueros || [];
     const isCompleted = completas.includes(usuarioActual.id_usuario);
+    
+    let updatedCompleted: string[] = [];
+    let calculatedArrows = 0;
+
+    if (!isCompleted) {
+      // Auto-complete ALL exercises
+      updatedCompleted = s.ejercicios_ids || [];
+      s.ejercicios_ids.forEach(eid => {
+        const ej = ejerciciosList.find(e => e.id === eid);
+        calculatedArrows += (ej?.intensidad_flechas_repeticion || 0);
+      });
+    } else {
+      // Clear completed exercises
+      updatedCompleted = [];
+      calculatedArrows = 0;
+    }
+
     const updatedCompletas = isCompleted 
       ? completas.filter(uid => uid !== usuarioActual.id_usuario)
       : [...completas, usuarioActual.id_usuario];
@@ -371,8 +442,75 @@ export default function ArqueroDashboard({
     onUpdateSesion({
       ...s,
       completada_por_arqueros: updatedCompletas,
-      completada: !isCompleted
+      completada: !isCompleted && updatedCompletas.length > 0,
+      ejercicios_completados_arqueros: {
+        ...(s.ejercicios_completados_arqueros || {}),
+        [usuarioActual.id_usuario]: updatedCompleted,
+      },
+      flechas_completadas_arqueros: {
+        ...(s.flechas_completadas_arqueros || {}),
+        [usuarioActual.id_usuario]: calculatedArrows,
+      }
     });
+  };
+
+  const handleToggleEjercicioCompletado = (s: Sesion, ejId: string) => {
+    if (!onUpdateSesion) return;
+    
+    const currentCompleted = s.ejercicios_completados_arqueros?.[usuarioActual.id_usuario] || [];
+    const updatedCompleted = currentCompleted.includes(ejId)
+      ? currentCompleted.filter(id => id !== ejId)
+      : [...currentCompleted, ejId];
+      
+    // Re-calculate arrows based on completed exercises
+    let totalFlechas = 0;
+    s.ejercicios_ids.forEach(eid => {
+      if (updatedCompleted.includes(eid)) {
+        const ej = ejerciciosList.find(e => e.id === eid);
+        totalFlechas += (ej?.intensidad_flechas_repeticion || 0);
+      }
+    });
+
+    const updatedSesion: Sesion = {
+      ...s
+    };
+
+    if (!updatedSesion.ejercicios_completados_arqueros) {
+      updatedSesion.ejercicios_completados_arqueros = {};
+    }
+    updatedSesion.ejercicios_completados_arqueros[usuarioActual.id_usuario] = updatedCompleted;
+
+    if (!updatedSesion.flechas_completadas_arqueros) {
+      updatedSesion.flechas_completadas_arqueros = {};
+    }
+    updatedSesion.flechas_completadas_arqueros[usuarioActual.id_usuario] = totalFlechas;
+
+    // If ALL exercises are completed, we can also set the whole session as completed.
+    const allCompleted = s.ejercicios_ids && s.ejercicios_ids.length > 0 && s.ejercicios_ids.every(id => updatedCompleted.includes(id));
+    const completas = s.completada_por_arqueros || [];
+    const isSessionCompleted = completas.includes(usuarioActual.id_usuario);
+
+    if (allCompleted && !isSessionCompleted) {
+      updatedSesion.completada_por_arqueros = [...completas, usuarioActual.id_usuario];
+      updatedSesion.completada = true;
+    } else if (!allCompleted && isSessionCompleted) {
+      updatedSesion.completada_por_arqueros = completas.filter(uid => uid !== usuarioActual.id_usuario);
+      updatedSesion.completada = updatedSesion.completada_por_arqueros.length > 0;
+    }
+
+    onUpdateSesion(updatedSesion);
+  };
+
+  const handleSetFlechasReales = (s: Sesion, num: number) => {
+    if (!onUpdateSesion) return;
+    
+    const updatedSesion: Sesion = { ...s };
+    if (!updatedSesion.flechas_completadas_arqueros) {
+      updatedSesion.flechas_completadas_arqueros = {};
+    }
+    updatedSesion.flechas_completadas_arqueros[usuarioActual.id_usuario] = Math.max(0, num);
+    
+    onUpdateSesion(updatedSesion);
   };
 
   const planesGrupales = misPlanificaciones.filter(p => p.tipo === 'grupo');
@@ -865,13 +1003,56 @@ export default function ArqueroDashboard({
 
               {/* Sesiones de Entrenamiento Asignadas */}
               <div className="space-y-4">
-                <span className="block text-xs font-bold uppercase tracking-wider text-slate-400">
-                  Sesiones Programadas ({misSesiones.length})
-                </span>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-100">
+                  <span className="block text-xs font-extrabold uppercase tracking-wider text-slate-400">
+                    Sesiones Programadas ({misSesiones.length})
+                  </span>
+                  
+                  {/* Selector de Filtros de Sesiones */}
+                  <div className="flex bg-slate-150/80 p-1 rounded-xl w-fit gap-1 self-start sm:self-auto border border-slate-200/40">
+                    <button
+                      type="button"
+                      onClick={() => setFiltroSesion('todos')}
+                      className={`px-3 py-1 text-[11px] font-black rounded-lg transition-all ${
+                        filtroSesion === 'todos' 
+                          ? 'bg-slate-900 text-white shadow-xs' 
+                          : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'
+                      }`}
+                    >
+                      Todas ({totalCount})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFiltroSesion('pendientes')}
+                      className={`px-3 py-1 text-[11px] font-black rounded-lg transition-all ${
+                        filtroSesion === 'pendientes' 
+                          ? 'bg-amber-500 text-white shadow-xs' 
+                          : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'
+                      }`}
+                    >
+                      ⚠️ Pendientes ({pendingCount})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFiltroSesion('completados')}
+                      className={`px-3 py-1 text-[11px] font-black rounded-lg transition-all ${
+                        filtroSesion === 'completados' 
+                          ? 'bg-emerald-600 text-white shadow-xs' 
+                          : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'
+                      }`}
+                    >
+                      🟢 Completadas ({completedCount})
+                    </button>
+                  </div>
+                </div>
                 
                 {misSesiones.length === 0 ? (
                   <p className="text-xs text-slate-450 italic bg-slate-50 border p-6 text-center rounded-xl border-dashed">
-                    No tienes sesiones de entrenamiento específicas programadas a tu nombre o grupo.
+                    {filtroSesion === 'pendientes' 
+                      ? '🎉 ¡Al día! No tienes entrenamientos pendientes actualmente.'
+                      : filtroSesion === 'completados'
+                      ? 'Aún no has completado entrenamientos. ¡Marca ejercicios de tus sesiones para completarlas!'
+                      : 'No tienes sesiones de entrenamiento específicas programadas a tu nombre o grupo.'}
                   </p>
                 ) : (
                   <div className="grid md:grid-cols-2 gap-5">
@@ -930,18 +1111,39 @@ export default function ArqueroDashboard({
 
                             <div className="space-y-2">
                               <span className="block text-[9px] uppercase font-bold text-slate-400 tracking-wider">
-                                Ejercicios asignados ({s.ejercicios_ids?.length || 0}):
+                                Ejercicios asignados ({s.ejercicios_ids?.length || 0}) • Pulsa para completar:
                               </span>
                               {s.ejercicios_ids && s.ejercicios_ids.filter(eid => ejerciciosList.some(e => e.id === eid)).length > 0 ? (
-                                <div className="space-y-1.5">
+                                <div className="space-y-1.55">
                                   {s.ejercicios_ids.map(eid => {
                                     const ej = ejerciciosList.find(e => e.id === eid);
                                     if (!ej) return null;
+                                    const ejCompletado = (s.ejercicios_completados_arqueros?.[usuarioActual.id_usuario] || []).includes(ej.id);
+                                    
                                     return (
-                                      <div key={eid} className="text-xs bg-white p-2.5 rounded-lg border border-slate-200 flex justify-between items-center shadow-4xs hover:border-slate-350 transition duration-150">
-                                        <div className="min-w-0 flex-1 pr-2">
-                                          <p className="font-bold text-slate-700 truncate">{ej.nombre}</p>
-                                          <p className="text-[10px] text-slate-400 leading-tight mt-0.5">{ej.descripcion}</p>
+                                      <div 
+                                        key={eid} 
+                                        onClick={() => handleToggleEjercicioCompletado(s, ej.id)}
+                                        className={`text-xs p-2.5 rounded-lg border flex justify-between items-center shadow-4xs transition duration-150 cursor-pointer ${
+                                          ejCompletado 
+                                            ? 'bg-emerald-50/40 border-emerald-250 hover:bg-emerald-50' 
+                                            : 'bg-white border-slate-200 hover:border-indigo-200'
+                                        }`}
+                                      >
+                                        <div className="flex items-start gap-2.5 min-w-0 flex-1 pr-2">
+                                          <div
+                                            className={`shrink-0 mt-0.5 w-4 h-4 rounded border flex items-center justify-center transition-all ${
+                                              ejCompletado 
+                                                ? 'bg-emerald-600 border-transparent text-white scale-105' 
+                                                : 'border-slate-300 bg-slate-50 hover:border-slate-400'
+                                            }`}
+                                          >
+                                            {ejCompletado && <Check size={11} className="stroke-[3.5px]" />}
+                                          </div>
+                                          <div className="min-w-0">
+                                            <p className={`font-bold transition-all ${ejCompletado ? 'text-slate-450 line-through' : 'text-slate-700'}`}>{ej.nombre}</p>
+                                            <p className="text-[10px] text-slate-400 leading-tight mt-0.5">{ej.descripcion}</p>
+                                          </div>
                                         </div>
                                         <div className="text-right shrink-0 ml-4 flex flex-col items-end gap-0.5">
                                           <p className="font-mono text-[10px] font-bold text-slate-500 flex items-center justify-end gap-1">
@@ -963,26 +1165,115 @@ export default function ArqueroDashboard({
                             </div>
                           </div>
 
-                          <div className="flex justify-between items-center pt-3 border-t border-slate-200 flex-wrap gap-2">
-                            <div className="flex items-center gap-3 text-[10px] flex-wrap">
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-slate-400 font-medium">Intensidad planificada:</span>
-                                <span className="font-extrabold font-mono text-[#ef233c] bg-red-50 p-0.5 px-2 rounded-md border-red-100 border">{s.intensidad}%</span>
+                          <div className="flex flex-col gap-3 pt-3 border-t border-slate-200">
+                            {/* Panel horizontal de flechas y progresos */}
+                            <div className="flex justify-between items-center flex-wrap gap-2">
+                              {/* Conteos dinámicos */}
+                              <div className="flex items-center gap-3 text-[10px] flex-wrap">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-slate-400 font-medium">Intensidad planificada:</span>
+                                  <span className="font-extrabold font-mono text-[#ef233c] bg-red-50 p-0.5 px-2 rounded-md border-red-100 border">{s.intensidad}%</span>
+                                </div>
+                                <span className="bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded-md font-bold text-[9px] uppercase flex items-center gap-1">
+                                  🎯 Planificado: {totalFlechasSesion} flechas
+                                </span>
+                                {(() => {
+                                  const completedQty = (s.ejercicios_completados_arqueros?.[usuarioActual.id_usuario] || []).length;
+                                  const totalQty = s.ejercicios_ids?.length || 0;
+                                  const flechasCompletadas = s.flechas_completadas_arqueros?.[usuarioActual.id_usuario] ?? 0;
+                                  
+                                  return (
+                                    <span className={`px-2 py-0.5 rounded-md font-bold text-[9px] uppercase flex items-center gap-1 border ${
+                                      flechasCompletadas === totalFlechasSesion && totalFlechasSesion > 0
+                                        ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                                        : 'bg-indigo-50 text-indigo-800 border-indigo-100'
+                                    }`}>
+                                      🏹 Completado: {flechasCompletadas} / {totalFlechasSesion} f. ({completedQty}/{totalQty} ej)
+                                    </span>
+                                  );
+                                })()}
                               </div>
-                              <span className="bg-amber-50 text-amber-850 border border-amber-200 px-2 py-0.5 rounded-md font-bold text-[9px] uppercase flex items-center gap-1">
-                                🏹 Total: {totalFlechasSesion} flechas
-                              </span>
+
+                              {/* Ajuste manual de flechas completadas */}
+                              {(() => {
+                                const flechasCompletadas = s.flechas_completadas_arqueros?.[usuarioActual.id_usuario] ?? 0;
+                                return (
+                                  <div className="flex items-center gap-2 py-1 px-2.5 bg-slate-50 border border-slate-200/60 rounded-xl">
+                                    <span className="text-[9px] font-extrabold text-slate-450 uppercase tracking-wide">Ajuste Flechas:</span>
+                                    <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg px-1.5 py-0.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSetFlechasReales(s, flechasCompletadas - 6)}
+                                        className="text-slate-400 hover:text-[#ef233c] font-black text-xs px-1 cursor-pointer transition-colors"
+                                        title="Restar una tanda de 6 flechas"
+                                      >
+                                        -6
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSetFlechasReales(s, flechasCompletadas - 1)}
+                                        className="text-slate-400 hover:text-[#ef233c] font-black text-xs px-1 cursor-pointer transition-colors"
+                                        title="Restar 1 flecha"
+                                      >
+                                        -
+                                      </button>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        max="1000"
+                                        value={flechasCompletadas}
+                                        onChange={(e) => handleSetFlechasReales(s, parseInt(e.target.value) || 0)}
+                                        className="w-10 text-center text-xs font-mono font-bold text-slate-800 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSetFlechasReales(s, flechasCompletadas + 1)}
+                                        className="text-slate-400 hover:text-emerald-600 font-bold text-xs px-1 cursor-pointer transition-colors"
+                                        title="Sumar 1 flecha"
+                                      >
+                                        +
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSetFlechasReales(s, flechasCompletadas + 6)}
+                                        className="text-slate-400 hover:text-emerald-600 font-bold text-xs px-1 cursor-pointer transition-colors"
+                                        title="Sumar una tanda de 6 flechas"
+                                      >
+                                        +6
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })()}
                             </div>
 
-                            {/* TOGGLE WORKOUT COMPLETION BUTTON */}
-                            <button
-                              onClick={() => handleToggleSesionCompletada(s)}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 duration-200 ${
-                                completada 
-                                  ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm' 
-                                  : 'bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 border border-transparent hover:border-emerald-200'
-                              }`}
-                            >
+                            <div className="flex justify-between items-center flex-wrap gap-2">
+                              <span className="text-[10px] text-slate-400 italic">Cada ejercicio completado registra flechas automáticamente. Puedes reajustarlas libremente.</span>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              {/* EXPORT TO PDF BUTTON */}
+                              <button
+                                onClick={() => {
+                                  const nameToPass = grupoName ? `${usuarioActual.nombre} (${grupoName})` : usuarioActual.nombre;
+                                  generateSessionPDF(s, ejerciciosList, nameToPass);
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-slate-700 hover:text-indigo-600 hover:bg-slate-100 border border-slate-200 hover:border-indigo-100 transition duration-150 cursor-pointer shadow-3xs"
+                                title="Imprimir / Guardar como PDF"
+                              >
+                                <Printer size={13} />
+                                <span>Imprimir</span>
+                              </button>
+
+                              {/* TOGGLE WORKOUT COMPLETION BUTTON */}
+                              <button
+                                onClick={() => handleToggleSesionCompletada(s)}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 duration-200 ${
+                                  completada 
+                                    ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm' 
+                                    : 'bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 border border-transparent hover:border-emerald-200'
+                                }`}
+                              >
                               {completada ? (
                                 <>
                                   <Check size={14} className="stroke-[3px]" />
@@ -997,7 +1288,8 @@ export default function ArqueroDashboard({
                             </button>
                           </div>
                         </div>
-                      );
+                      </div>
+                    );
                     })}
                   </div>
                 )}
@@ -1155,8 +1447,23 @@ export default function ArqueroDashboard({
                         <option value="60m">60 metros (Cadete)</option>
                         <option value="70m">70 metros (Olímpico)</option>
                         <option value="90m">90 metros (Larga Distancia)</option>
+                        <option value="Otro">⚙️ Otro (Especificar...)</option>
                       </select>
                     </div>
+
+                    {visorDistancia === 'Otro' && (
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Especificar Distancia Personalizada</label>
+                        <input
+                          type="text"
+                          required
+                          value={visorDistanciaOtro}
+                          onChange={(e) => setVisorDistanciaOtro(e.target.value)}
+                          placeholder="Ej. 25m, Recorrido Campo, bosque..."
+                          className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg p-2 font-bold"
+                        />
+                      </div>
+                    )}
 
                     <div>
                       <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Medida del Visor (Número / Altura)</label>
@@ -1167,6 +1474,28 @@ export default function ArqueroDashboard({
                         onChange={(e) => setVisorMedida(e.target.value)}
                         placeholder="Ej. 5.4 o 4.85"
                         className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg p-2 font-mono font-bold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Potencia en Palas (Libras / Opcional)</label>
+                      <input 
+                        type="text" 
+                        value={visorLibras}
+                        onChange={(e) => setVisorLibras(e.target.value)}
+                        placeholder="Ej. 40 lbs o 38#"
+                        className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg p-2 font-medium"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Objetivo / Enfoque Mental Específico (Opcional)</label>
+                      <textarea 
+                        rows={2}
+                        value={visorObjetivoMental}
+                        onChange={(e) => setVisorObjetivoMental(e.target.value)}
+                        placeholder="Ej. Sentir el clíker sobre la punta, alineación ocular con la fibra..."
+                        className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg p-2 leading-relaxed"
                       />
                     </div>
 

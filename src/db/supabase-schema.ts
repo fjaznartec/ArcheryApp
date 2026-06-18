@@ -107,10 +107,19 @@ CREATE TABLE public.planificacion (
 -- Tabla: sesiones
 CREATE TABLE public.sesiones (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  id_planificacion UUID NOT NULL REFERENCES public.planificacion(id) ON DELETE CASCADE,
-  fecha_assigned DATE NOT NULL DEFAULT CURRENT_DATE,
+  id_planificacion UUID REFERENCES public.planificacion(id) ON DELETE CASCADE, -- Ahora es opcional / nullable
+  titulo VARCHAR(255) NOT NULL DEFAULT 'Sesión de Entrenamiento',
+  tipo_entrenamiento VARCHAR(100) NOT NULL DEFAULT 'Técnico',
+  fecha_asignada DATE NOT NULL DEFAULT CURRENT_DATE,
+  asignado_a VARCHAR(50) NOT NULL DEFAULT 'arquero' CHECK (asignado_a IN ('grupo', 'arquero')),
+  id_grupo UUID REFERENCES public.grupos_entrenamiento(id) ON DELETE CASCADE,
+  id_arquero UUID REFERENCES public.usuarios(id_usuario) ON DELETE CASCADE,
+  ejercicios_ids JSONB DEFAULT '[]'::jsonb,
   intensidad INTEGER NOT NULL CHECK (intensidad BETWEEN 1 AND 100),
-  comentarios TEXT
+  comentarios TEXT,
+  completada_por_arqueros JSONB DEFAULT '[]'::jsonb,
+  ejercicios_completados_arqueros JSONB DEFAULT '{}'::jsonb,
+  flechas_completadas_arqueros JSONB DEFAULT '{}'::jsonb
 );
 
 -- Tabla: ejercicios
@@ -391,6 +400,43 @@ USING (
     SELECT m.id_arquero FROM public.miembros_grupo m
     JOIN public.grupos_entrenamiento g ON m.id_grupo = g.id
     WHERE g.id_tecnico = auth.uid() AND m.estado = 'aceptado'
+  )
+);
+
+-- Políticas de la tabla: sesiones
+CREATE POLICY "Permitir lectura de sesiones asignadas"
+ON public.sesiones FOR SELECT
+TO authenticated
+USING (
+  id_arquero = auth.uid() OR
+  id_grupo IN (
+    SELECT id_grupo FROM public.miembros_grupo WHERE id_arquero = auth.uid() AND estado = 'aceptado'
+  ) OR
+  EXISTS (
+    SELECT 1 FROM public.usuarios WHERE id_usuario = auth.uid() AND rol IN ('tecnico', 'admin')
+  )
+);
+
+CREATE POLICY "Permitir actualización de sesiones (auto-marcación de ejercicios/flechas o técnico)"
+ON public.sesiones FOR UPDATE
+TO authenticated
+USING (
+  id_arquero = auth.uid() OR
+  id_grupo IN (
+    SELECT id_grupo FROM public.miembros_grupo WHERE id_arquero = auth.uid() AND estado = 'aceptado'
+  ) OR
+  EXISTS (
+    SELECT 1 FROM public.usuarios WHERE id_usuario = auth.uid() AND rol IN ('tecnico', 'admin')
+  )
+)
+WITH CHECK (true);
+
+CREATE POLICY "Permitir inserción y borrado de sesiones a Técnicos y Admins"
+ON public.sesiones FOR ALL
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM public.usuarios WHERE id_usuario = auth.uid() AND rol IN ('tecnico', 'admin')
   )
 );
 

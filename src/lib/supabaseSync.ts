@@ -219,6 +219,25 @@ export async function pushAllToSupabase(localData: {
     }));
     results.setups_rutinas = await pushToSupabase('setups_rutinas', formattedSetups);
 
+    // 11. Sesiones
+    const formattedSesiones = localData.sesiones.map(s => ({
+      id: transformMockIdToUUID(s.id),
+      id_planificacion: null, // Since plans are freestanding in our newer simplified flow or linked locally
+      titulo: s.titulo || 'Sesión de Entrenamiento',
+      tipo_entrenamiento: s.tipo_entrenamiento || 'Técnico',
+      fecha_asignada: s.fecha_asignada || new Date().toISOString().split('T')[0],
+      asignado_a: s.asignado_a || 'arquero',
+      id_grupo: s.id_grupo ? transformMockIdToUUID(s.id_grupo) : null,
+      id_arquero: s.id_arquero && !s.id_arquero.startsWith('usr-') ? s.id_arquero : (s.id_arquero ? generateUUIDForMockId(s.id_arquero) : null),
+      ejercicios_ids: s.ejercicios_ids || [],
+      intensidad: s.intensidad || 50,
+      comentarios: s.comentarios || null,
+      completada_por_arqueros: s.completada_por_arqueros || [],
+      ejercicios_completados_arqueros: s.ejercicios_completados_arqueros || {},
+      flechas_completadas_arqueros: s.flechas_completadas_arqueros || {}
+    }));
+    results.sesiones = await pushToSupabase('sesiones', formattedSesiones);
+
     return { success: true, results };
   } catch (err: any) {
     console.error("General sync failure:", err);
@@ -304,6 +323,26 @@ export async function pullFromSupabase() {
         contenido: n.contenido,
         fecha: n.fecha_creacion,
         nivel_competicion: n.nivel_competicion
+      }));
+    }
+
+    // Fetch sessions (sesiones)
+    const { data: dbSesiones } = await supabase.from('sesiones').select('*');
+    if (dbSesiones) {
+      data.sesiones = dbSesiones.map(s => ({
+        id: s.id,
+        titulo: s.titulo,
+        tipo_entrenamiento: s.tipo_entrenamiento,
+        fecha_asignada: s.fecha_asignada,
+        asignado_a: s.asignado_a,
+        id_grupo: s.id_grupo,
+        id_arquero: s.id_arquero,
+        ejercicios_ids: s.ejercicios_ids || [],
+        intensidad: s.intensidad,
+        comentarios: s.comentarios || '',
+        completada_por_arqueros: s.completada_por_arqueros || [],
+        ejercicios_completados_arqueros: s.ejercicios_completados_arqueros || {},
+        flechas_completadas_arqueros: s.flechas_completadas_arqueros || {}
       }));
     }
 
