@@ -11,7 +11,15 @@ const getEnvValue = (val: any, fallback: string): string => {
 const rawUrl = import.meta.env.VITE_SUPABASE_URL;
 const rawKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-const supabaseUrl = getEnvValue(rawUrl, 'https://bcjzhohbrkvyaojwogvk.supabase.co');
+let supabaseUrl = getEnvValue(rawUrl, 'https://bcjzhohbrkvyaojwogvk.supabase.co');
+
+// Clean up trailing /rest/v1/ or /rest/v1 if present in user inputs
+if (supabaseUrl.endsWith('/rest/v1/')) {
+  supabaseUrl = supabaseUrl.slice(0, -9);
+} else if (supabaseUrl.endsWith('/rest/v1')) {
+  supabaseUrl = supabaseUrl.slice(0, -8);
+}
+
 const supabaseAnonKey = getEnvValue(rawKey, 'sb_publishable_xRvNrxwqhLAIApmzz8Ditg_W3-Oajzi');
 
 // final fallback confirmation for safety

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Usuario, GrupoEntrenamiento, MiembroGrupo, Planificacion, Sesion, Ejercicio, PlanificacionTipo, EjercicioTipo, EjercicioDificultad, DiarioEntrada, ControlTiro, SetupRutina, MesocicloPlan, MicrocicloPlan, CompeticionPlaneada } from '../types';
 import { Users, Calendar, Target, FileText, TrendingUp, Sparkles, Plus, Eye, CheckCircle, BarChart2, Trash2, BookOpen, ArrowLeft, Sliders, MessageSquare, Check, UserPlus, Pencil, X, Search, Trophy, ChevronLeft, ChevronRight, Printer } from 'lucide-react';
 import { generateSessionPDF } from '../lib/pdfGenerator';
+import DianaControlDashboard from './DianaControlDashboard';
 
 interface TecnicoDashboardProps {
   usuarioActual: Usuario;
@@ -14,6 +15,7 @@ interface TecnicoDashboardProps {
   diariosList: DiarioEntrada[];
   controlesList: ControlTiro[];
   setupsList: SetupRutina[];
+  impactosList?: any[];
   onApproveMiembro: (idGrupo: string, idArquero: string) => void;
   onAddMiembroDirecto: (idGrupo: string, idArquero: string) => void;
   onRemoveMiembroGrupo: (idGrupo: string, idArquero: string) => void;
@@ -43,6 +45,7 @@ export default function TecnicoDashboard({
   diariosList,
   controlesList,
   setupsList,
+  impactosList = [],
   onApproveMiembro,
   onAddMiembroDirecto,
   onRemoveMiembroGrupo,
@@ -1066,6 +1069,17 @@ export default function TecnicoDashboard({
                 </div>
 
               </div>
+
+              {/* MÓDULO DE DIANA CONTROL INTERACTIVA DEL ALUMNO */}
+              <div id="dossier-diana-analisis" className="mt-8 border-t border-slate-100 pt-8">
+                <DianaControlDashboard 
+                  idArquero={selectedArcherId}
+                  controlesList={controlesList}
+                  impactosList={impactosList}
+                  tituloDashboard={`Análisis de Diana de Control: ${getNombreUsuario(selectedArcherId)}`}
+                />
+              </div>
+
             </div>
           ) : (
             // Mostrar Gestión de Grupos Normales

@@ -19,6 +19,7 @@ export default function App() {
   const [diarios, setDiarios] = useState<DiarioEntrada[]>([]);
   const [controles, setControles] = useState<ControlTiro[]>([]);
   const [setups, setSetups] = useState<SetupRutina[]>([]);
+  const [impactos, setImpactos] = useState<ImpactoFlecha[]>([]);
 
   // --- SESIÓN Y NAVEGACIÓN ---
   const [usuarioLogueado, setUsuarioLogueado] = useState<Usuario | null>(null);
@@ -356,6 +357,39 @@ export default function App() {
     }
     setSesiones(seedSesiones);
 
+    // 11. Impactos para dianas y estadísticas
+    const sImps = localStorage.getItem('archery_impactos');
+    let seedImps: ImpactoFlecha[] = [];
+    if (sImps) {
+      seedImps = JSON.parse(sImps);
+    } else {
+      const values = ['X', '10', '9', '10', '9', '8'];
+      for (let s = 1; s <= 1; s++) { 
+        for (let t = 1; t <= 6; t++) { 
+          for (let f = 0; f < 6; f++) {
+            const val = values[(t + f) % values.length];
+            let r = 10;
+            if (val === 'X') r = 3 + Math.random() * 5;
+            else if (val === '10') r = 8 + Math.random() * 6;
+            else if (val === '9') r = 16 + Math.random() * 12;
+            else if (val === '8') r = 30 + Math.random() * 12;
+            const angle = Math.random() * Math.PI * 2;
+            seedImps.push({
+              id_control: 'ctrl-1',
+              serie: s,
+              tanda: t,
+              flecha_index: f + 1,
+              valor_impacto: val,
+              x: 150 + r * Math.cos(angle),
+              y: 150 + r * Math.sin(angle)
+            });
+          }
+        }
+      }
+      localStorage.setItem('archery_impactos', JSON.stringify(seedImps));
+    }
+    setImpactos(seedImps);
+
   }, []);
 
   // --- HANDLERS BASE DE DATOS MOCK ---
@@ -602,16 +636,21 @@ export default function App() {
 
   // Guardar control completo Diana Interactiva
   const handleAddControlTiro = (nuevoCtrl: ControlTiro, deImpactos: ImpactoFlecha[]) => {
+    // Vincular impactos con el id real del control de tiro generado
+    const impactosVinculados = deImpactos.map(imp => ({
+      ...imp,
+      id_control: nuevoCtrl.id
+    }));
+
     // Guardar control
     const listControles = [nuevoCtrl, ...controles];
     setControles(listControles);
     localStorage.setItem('archery_controles', JSON.stringify(listControles));
 
     // Guardar impactos del control en una lista persistida para analiticas
-    const sImps = localStorage.getItem('archery_impactos') || '[]';
-    const antiguos: ImpactoFlecha[] = JSON.parse(sImps);
-    const actualizados = [...antiguos, ...deImpactos];
-    localStorage.setItem('archery_impactos', JSON.stringify(actualizados));
+    const hImpactosActualizados = [...impactos, ...impactosVinculados];
+    setImpactos(hImpactosActualizados);
+    localStorage.setItem('archery_impactos', JSON.stringify(hImpactosActualizados));
 
     // También creamos un registro automático de entrenamiento en el Diario para que aparezca en su historial
     const entradaA: DiarioEntrada = {
@@ -807,6 +846,7 @@ export default function App() {
             diariosList={diarios}
             controlesList={controles}
             setupsList={setups}
+            impactosList={impactos}
             onApproveMiembro={handleApproveMiembro}
             onAddMiembroDirecto={handleAddMiembroDirecto}
             onRemoveMiembroGrupo={handleRemoveMiembroGrupo}
@@ -836,6 +876,7 @@ export default function App() {
             diariosList={diarios}
             controlesList={controles}
             setupsList={setups}
+            impactosList={impactos}
             onAddDiario={handleAddDiario}
             onAddControlTiro={handleAddControlTiro}
             onApplyGrupo={handleApplyGrupo}

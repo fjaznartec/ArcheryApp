@@ -201,6 +201,9 @@ export interface ImpactoFlecha {
   tanda: number;
   flecha_index: number;
   valor_impacto: string; // 'X', '10', '9'...'1', 'M'
+  x?: number;
+  y?: number;
+  spot?: string;
 }
 
 export type SeguimientoTipoSesion = 'Entrenamiento' | 'Competición';

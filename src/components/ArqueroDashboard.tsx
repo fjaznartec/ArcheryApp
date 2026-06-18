@@ -4,6 +4,7 @@ import { BookOpen, Target, Compass, Award, Calendar, Settings, Sparkles, Plus, T
 import { generateSessionPDF } from '../lib/pdfGenerator';
 import DianaInteractiva from './DianaInteractiva';
 import ContadorFlechas from './ContadorFlechas';
+import DianaControlDashboard from './DianaControlDashboard';
 
 interface ArqueroDashboardProps {
   usuarioActual: Usuario;
@@ -16,6 +17,7 @@ interface ArqueroDashboardProps {
   diariosList: DiarioEntrada[];
   controlesList: ControlTiro[];
   setupsList: SetupRutina[];
+  impactosList?: ImpactoFlecha[];
   onAddDiario: (d: DiarioEntrada) => void;
   onAddControlTiro: (c: ControlTiro, imps: ImpactoFlecha[]) => void;
   onApplyGrupo: (idGrupo: string) => void;
@@ -37,6 +39,7 @@ export default function ArqueroDashboard({
   diariosList,
   controlesList,
   setupsList,
+  impactosList = [],
   onAddDiario,
   onAddControlTiro,
   onApplyGrupo,
@@ -756,7 +759,7 @@ export default function ArqueroDashboard({
 
         {/* TAB DIANA INTERACTIVA */}
         {activeTab === 'controles' && (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div className="bg-slate-900 text-white p-4 rounded-xl flex justify-between items-center">
               <div>
                 <h3 className="text-sm font-extrabold text-slate-100 flex items-center gap-1.5">
@@ -767,6 +770,13 @@ export default function ArqueroDashboard({
               </div>
             </div>
             <DianaInteractiva idArquero={usuarioActual.id_usuario} onSaveControl={onAddControlTiro} />
+
+            <DianaControlDashboard 
+              idArquero={usuarioActual.id_usuario}
+              controlesList={controlesList}
+              impactosList={impactosList}
+              tituloDashboard="Mis Dianas de Control (Historial Analítico)"
+            />
           </div>
         )}
 

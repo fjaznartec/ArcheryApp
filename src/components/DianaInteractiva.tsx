@@ -184,7 +184,10 @@ export default function DianaInteractiva({ idArquero, onSaveControl }: DianaInte
       serie: selectedSerie,
       tanda: selectedTanda,
       flecha_index: currentImps.length + 1,
-      valor_impacto: hit.value
+      valor_impacto: hit.value,
+      x,
+      y,
+      spot: currentSpot
     };
 
     setImpactos(prev => [...prev, nuevoImpacto]);
@@ -205,16 +208,6 @@ export default function DianaInteractiva({ idArquero, onSaveControl }: DianaInte
       alert(`Tanda llena. Avanza a la siguiente.`);
       return;
     }
-
-    const nuevoImpacto: ImpactoFlecha = {
-      id_control: 'temp-control-id',
-      serie: selectedSerie,
-      tanda: selectedTanda,
-      flecha_index: currentImps.length + 1,
-      valor_impacto: value
-    };
-
-    setImpactos(prev => [...prev, nuevoImpacto]);
 
     // Para colocar un punto visual aleatorio dentro del anillo de esa puntuación
     // Esto asegura que la diana siga poblándose visualmente aunque usen el teclado rápido!
@@ -254,7 +247,21 @@ export default function DianaInteractiva({ idArquero, onSaveControl }: DianaInte
     const x = center + r * Math.cos(angle);
     const y = center + r * Math.sin(angle);
 
-    setPuntosDiana(prev => [...prev, { x, y, value }]);
+    const currentSpot = tipoDiana.startsWith('Tr. Vertical') ? activeSpot : undefined;
+
+    const nuevoImpacto: ImpactoFlecha = {
+      id_control: 'temp-control-id',
+      serie: selectedSerie,
+      tanda: selectedTanda,
+      flecha_index: currentImps.length + 1,
+      valor_impacto: value,
+      x,
+      y,
+      spot: currentSpot
+    };
+
+    setImpactos(prev => [...prev, nuevoImpacto]);
+    setPuntosDiana(prev => [...prev, { x, y, value, spot: currentSpot }]);
   };
 
   // Convertir valores de impacto a numéricos para los cálculos
