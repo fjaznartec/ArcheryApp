@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import { Sesion, Ejercicio } from '../types';
+import { Sesion, Ejercicio, Usuario } from '../types';
 
 /**
  * Generates and downloads a polished PDF workout card for a specific training session.
@@ -7,7 +7,8 @@ import { Sesion, Ejercicio } from '../types';
 export function generateSessionPDF(
   session: Sesion,
   exercisesList: Ejercicio[],
-  assignedName: string
+  assignedName: string,
+  usuariosList?: Usuario[]
 ) {
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -53,7 +54,7 @@ export function generateSessionPDF(
       doc.setFont('Helvetica', 'bold');
       doc.setFontSize(10);
       doc.setTextColor('#6366f1'); // Indigo-500
-      doc.text('ARCHERY PROFESSIONAL SUITE', marginX, 16);
+      doc.text('ARCHERY APP - Sesion de Entrenamiento', marginX, 16);
 
       doc.setFont('Helvetica', 'normal');
       doc.setFontSize(8);
@@ -65,7 +66,7 @@ export function generateSessionPDF(
       doc.setFont('Helvetica', 'bold');
       doc.setFontSize(8);
       doc.setTextColor('#6366f1');
-      doc.text('ARCHERY SUITE — FICHA DE SESIÓN', marginX, 10);
+      doc.text('ARCHERY APP — Sesion de Entrenamiento', marginX, 10);
       
       doc.setFont('Helvetica', 'normal');
       doc.setFontSize(8);
@@ -88,12 +89,19 @@ export function generateSessionPDF(
   doc.text(titleLines, marginX, currentY);
   currentY += (titleLines.length * 8) + 2;
 
+  // Find Técnico Principal & Técnico Auxiliar names from usuariosList
+  const tp = (usuariosList || []).find(u => u.rol === 'tecnico_principal');
+  const nameTP = tp ? `${tp.nombre} ${tp.apellidos}` : 'Francisco Javier Antón';
+
+  const ta = (usuariosList || []).find(u => u.rol === 'tecnico_auxiliar');
+  const nameTA = ta ? `${ta.nombre} ${ta.apellidos}` : 'Marta Sánchez (Auxiliar)';
+
   // Subtitle/Meta Section Box
-  ensureSpace(35);
+  ensureSpace(45);
   doc.setFillColor('#f8fafc'); // slate-50
   doc.setDrawColor('#e2e8f0');
   doc.setLineWidth(0.3);
-  doc.roundedRect(marginX, currentY, pageWidth - marginX * 2, 28, 3, 3, 'FD');
+  doc.roundedRect(marginX, currentY, pageWidth - marginX * 2, 38, 3, 3, 'FD');
 
   doc.setFont('Helvetica', 'bold');
   doc.setFontSize(9);
@@ -103,6 +111,8 @@ export function generateSessionPDF(
   doc.text('TIPO DE ENTRENAMIENTO:', marginX + 5, currentY + 6);
   doc.text('FECHA PROGRAMADA:', marginX + 5, currentY + 13);
   doc.text('ASIGNADO A:', marginX + 5, currentY + 20);
+  doc.text('TÉCNICO PRINCIPAL:', marginX + 5, currentY + 27);
+  doc.text('TÉCNICO AUXILIAR:', marginX + 5, currentY + 34);
 
   // Column 1 Values
   doc.setFont('Helvetica', 'bold');
@@ -112,6 +122,8 @@ export function generateSessionPDF(
   doc.setTextColor('#0f172a');
   doc.text(session.fecha_asignada, marginX + 55, currentY + 13);
   doc.text(assignedName, marginX + 55, currentY + 20);
+  doc.text(nameTP, marginX + 55, currentY + 27);
+  doc.text(nameTA, marginX + 55, currentY + 34);
 
   // Column 2 Info & Badges inside box
   doc.setFont('Helvetica', 'bold');
@@ -132,7 +144,7 @@ export function generateSessionPDF(
   doc.setTextColor('#1e1b4b');
   doc.text(`${totalArrows} flechas`, marginX + 160, currentY + 13);
 
-  currentY += 34;
+  currentY += 44;
 
   // 3. Comments block (if exists)
   if (session.comentarios) {

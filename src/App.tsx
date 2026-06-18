@@ -657,6 +657,11 @@ export default function App() {
     controles?: ControlTiro[];
     noticias?: any[];
     sesiones?: Sesion[];
+    grupos?: GrupoEntrenamiento[];
+    miembros?: MiembroGrupo[];
+    planificaciones?: Planificacion[];
+    ejercicios?: Ejercicio[];
+    impactos?: ImpactoFlecha[];
   }) => {
     if (data.usuarios && data.usuarios.length > 0) {
       setUsuarios(data.usuarios);
@@ -681,6 +686,25 @@ export default function App() {
     if (data.sesiones && data.sesiones.length > 0) {
       setSesiones(data.sesiones);
       localStorage.setItem('archery_sesiones_entrenamiento', JSON.stringify(data.sesiones));
+    }
+    if (data.grupos && data.grupos.length > 0) {
+      setGrupos(data.grupos);
+      localStorage.setItem('archery_grupos', JSON.stringify(data.grupos));
+    }
+    if (data.miembros && data.miembros.length > 0) {
+      setMiembros(data.miembros);
+      localStorage.setItem('archery_miembros', JSON.stringify(data.miembros));
+    }
+    if (data.planificaciones && data.planificaciones.length > 0) {
+      setPlanificaciones(data.planificaciones);
+      localStorage.setItem('archery_planificaciones', JSON.stringify(data.planificaciones));
+    }
+    if (data.ejercicios && data.ejercicios.length > 0) {
+      setEjercicios(data.ejercicios);
+      localStorage.setItem('archery_ejercicios', JSON.stringify(data.ejercicios));
+    }
+    if (data.impactos && data.impactos.length > 0) {
+      localStorage.setItem('archery_impactos', JSON.stringify(data.impactos));
     }
   };
 
@@ -803,6 +827,7 @@ export default function App() {
         ) : (
           <ArqueroDashboard 
             usuarioActual={usuarioLogueado}
+            usuariosList={usuarios}
             gruposList={grupos}
             miembrosList={miembros}
             planificaciones={planificaciones}

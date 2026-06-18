@@ -2791,7 +2791,7 @@ export default function TecnicoDashboard({
                           <div key={s.id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl relative hover:border-indigo-200 transition space-y-3">
                             <div className="absolute top-4 right-4 flex items-center gap-2">
                               <button
-                                onClick={() => generateSessionPDF(s, ejerciciosList, targetText)}
+                                onClick={() => generateSessionPDF(s, ejerciciosList, targetText, usuariosList)}
                                 className="text-slate-500 hover:text-indigo-600 bg-white hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 p-1 rounded-md transition shadow-2xs cursor-pointer flex items-center justify-center"
                                 title="Imprimir / Exportar a PDF"
                               >

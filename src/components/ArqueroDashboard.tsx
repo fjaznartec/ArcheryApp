@@ -7,6 +7,7 @@ import ContadorFlechas from './ContadorFlechas';
 
 interface ArqueroDashboardProps {
   usuarioActual: Usuario;
+  usuariosList?: Usuario[];
   gruposList: GrupoEntrenamiento[];
   miembrosList: MiembroGrupo[];
   planificaciones: Planificacion[];
@@ -27,6 +28,7 @@ interface ArqueroDashboardProps {
 
 export default function ArqueroDashboard({
   usuarioActual,
+  usuariosList = [],
   gruposList,
   miembrosList,
   planificaciones,
@@ -1256,7 +1258,7 @@ export default function ArqueroDashboard({
                               <button
                                 onClick={() => {
                                   const nameToPass = grupoName ? `${usuarioActual.nombre} (${grupoName})` : usuarioActual.nombre;
-                                  generateSessionPDF(s, ejerciciosList, nameToPass);
+                                  generateSessionPDF(s, ejerciciosList, nameToPass, usuariosList);
                                 }}
                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-slate-700 hover:text-indigo-600 hover:bg-slate-100 border border-slate-200 hover:border-indigo-100 transition duration-150 cursor-pointer shadow-3xs"
                                 title="Imprimir / Guardar como PDF"

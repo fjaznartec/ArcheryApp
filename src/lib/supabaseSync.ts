@@ -18,6 +18,7 @@ export async function checkSupabaseConnection(): Promise<SyncStatus> {
       grupos_entrenamiento: false,
       miembros_grupo: false,
       planificacion: false,
+      sesiones: false,
       ejercicios: false,
       diario: false,
       controles_tiro: false,
@@ -343,6 +344,73 @@ export async function pullFromSupabase() {
         completada_por_arqueros: s.completada_por_arqueros || [],
         ejercicios_completados_arqueros: s.ejercicios_completados_arqueros || {},
         flechas_completadas_arqueros: s.flechas_completadas_arqueros || {}
+      }));
+    }
+
+    // Fetch grupos_entrenamiento
+    const { data: dbGrupos } = await supabase.from('grupos_entrenamiento').select('*');
+    if (dbGrupos) {
+      data.grupos = dbGrupos.map(g => ({
+        id: g.id,
+        nombre_grupo: g.nombre_grupo,
+        id_tecnico: g.id_tecnico
+      }));
+    }
+
+    // Fetch miembros_grupo
+    const { data: dbMiembros } = await supabase.from('miembros_grupo').select('*');
+    if (dbMiembros) {
+      data.miembros = dbMiembros.map(m => ({
+        id_grupo: m.id_grupo,
+        id_arquero: m.id_arquero,
+        estado: m.estado
+      }));
+    }
+
+    // Fetch planificacion
+    const { data: dbPlanes } = await supabase.from('planificacion').select('*');
+    if (dbPlanes) {
+      data.planificaciones = dbPlanes.map(p => ({
+        id: p.id,
+        id_grupo: p.id_grupo,
+        id_arquero: p.id_arquero,
+        tipo: p.tipo,
+        macrociclo: p.macrociclo,
+        mesociclo: p.mesociclo,
+        microciclo: p.microciclo,
+        temporada: p.temporada,
+        objetivos_macrociclo: p.objetivos_macrociclo,
+        fecha_inicio: p.fecha_inicio,
+        fecha_fin: p.fecha_fin,
+        mesociclos_lista: p.mesociclos_lista || [],
+        competiciones: p.competiciones || []
+      }));
+    }
+
+    // Fetch ejercicios
+    const { data: dbEjercicios } = await supabase.from('ejercicios').select('*');
+    if (dbEjercicios) {
+      data.ejercicios = dbEjercicios.map(e => ({
+        id: e.id,
+        nombre: e.nombre,
+        tipo_ejercicio: e.tipo_ejercicio,
+        descripcion: e.descripcion,
+        duracion: e.duracion,
+        densidad_repeticiones: e.densidad_repeticiones,
+        dificultad: e.dificultad,
+        intensidad_flechas_repeticion: e.intensidad_flechas_repeticion
+      }));
+    }
+
+    // Fetch impactos_flechas
+    const { data: dbImpactos } = await supabase.from('impactos_flechas').select('*');
+    if (dbImpactos) {
+      data.impactos = dbImpactos.map(i => ({
+        id_control: i.id_control,
+        serie: i.serie,
+        tanda: i.tanda,
+        flecha_index: i.flecha_index,
+        valor_impacto: i.valor_impacto
       }));
     }
 
