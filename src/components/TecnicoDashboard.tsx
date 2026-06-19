@@ -109,6 +109,274 @@ export default function TecnicoDashboard({
   // Estado para el macrociclo seleccionado para diseño jerárquico
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
 
+  // Filtro de temporada para planificación anual
+  const [filterTemporada, setFilterTemporada] = useState<string>('todos');
+  // Filtro de tipo de planificación para planificación anual
+  const [filterTipo, setFilterTipo] = useState<string>('todos'); // 'todos' | 'grupo' | 'individual'
+  // Filtro de arquero específico para planificación individual
+  const [filterArqueroId, setFilterArqueroId] = useState<string>('todos'); // 'todos' | string
+
+  // Obtener todas las temporadas únicas disponibles dinámicamente
+  const temporadasDisponibles = Array.from(
+    new Set(
+      (planificaciones || [])
+        .map((p) => p.temporada)
+        .filter((t): t is string => typeof t === 'string' && t.trim() !== '')
+    )
+  ).sort();
+
+  const planificacionesFiltradas = (planificaciones || []).filter((p) => {
+    // 1. Filtro por temporada
+    if (filterTemporada !== 'todos' && p.temporada !== filterTemporada) {
+      return false;
+    }
+    // 2. Filtro por tipo de planificación
+    if (filterTipo !== 'todos' && p.tipo !== filterTipo) {
+      return false;
+    }
+    // 3. Filtro por arquero (solo aplica si es de tipo individual y se seleccionó un arquero específico)
+    if (filterTipo === 'individual' && filterArqueroId !== 'todos' && p.id_arquero !== filterArqueroId) {
+      return false;
+    }
+    return true;
+  });
+
+  const imprimirPlanificacionDetallada = (plan: Planificacion) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Por favor, permite las ventanas emergentes en tu navegador para visualizar y descargar el reporte de planificación.');
+      return;
+    }
+
+    const nombreAsignado = plan.tipo === 'grupo'
+      ? `Grupo: ${getNombreGrupo(plan.id_grupo || '')}`
+      : `Arquero: ${getNombreUsuario(plan.id_arquero || '')}`;
+
+    const mesociclosHTML = (plan.mesociclos_lista || []).map((meso, idx) => {
+      const microciclosHTML = (meso.microciclos || []).map((micro) => `
+        <tr class="border-b border-gray-100 hover:bg-slate-50/50">
+          <td class="py-2.5 px-3 font-bold text-slate-800 text-xs">${micro.nombre}</td>
+          <td class="py-2.5 px-3 text-slate-600 text-xs font-semibold">${micro.fechas}</td>
+          <td class="py-2.5 px-3 text-slate-700 text-xs font-mono font-bold">${micro.volumen_flechas ? `${micro.volumen_flechas} flechas` : '---'}</td>
+          <td class="py-2.5 px-3 text-indigo-700 font-bold text-xs">${micro.enfoque_principal}</td>
+          <td class="py-2.5 px-3 text-slate-600 text-xs">${micro.objetivos || '---'}</td>
+        </tr>
+      `).join('');
+
+      return `
+        <div class="mb-6 bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs page-break-inside-avoid">
+          <div class="bg-slate-100/90 px-4 py-3 border-b border-slate-200 flex justify-between items-center flex-wrap gap-2">
+            <h4 class="text-xs font-black text-slate-800">
+              ${idx + 1}. Mesociclo: <span class="text-indigo-600 font-extrabold">${meso.nombre}</span> 
+              <span class="bg-indigo-100 text-indigo-800 text-[9px] font-extrabold px-2 py-0.5 rounded ml-2 uppercase tracking-wide border border-indigo-200">${meso.tipo_mesociclo}</span>
+            </h4>
+            <span class="text-xs text-slate-500 font-bold">📅 Periodo: ${meso.fecha_inicio} al ${meso.fecha_fin}</span>
+          </div>
+          <div class="p-3">
+            ${(meso.microciclos || []).length === 0 ? `
+              <p class="text-xs text-slate-400 italic py-3 text-center">No hay microciclos configurados en este periodo.</p>
+            ` : `
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 font-extrabold text-[9px] uppercase tracking-wider">
+                    <th class="py-2 px-3">Microciclo</th>
+                    <th class="py-2 px-3">Fechas</th>
+                    <th class="py-2 px-3">Volumen Estimado</th>
+                    <th class="py-2 px-3">Enfoque Principal</th>
+                    <th class="py-2 px-3">Objetivos Específicos</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${microciclosHTML}
+                </tbody>
+              </table>
+            `}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    const competicionesHTML = (plan.competiciones || []).map((c) => `
+      <tr class="border-b border-slate-100">
+        <td class="py-2.5 px-3 text-xs font-bold text-slate-850">${c.nombre}</td>
+        <td class="py-2.5 px-3 text-xs font-mono font-bold text-slate-600">${c.fecha}</td>
+        <td class="py-2.5 px-3 text-xs">
+          <span class="px-2 py-0.5 rounded text-[9px] font-extrabold uppercase border ${
+            c.importancia === 'Alta' ? 'bg-red-50 text-red-800 border-red-200' :
+            c.importancia === 'Media' ? 'bg-amber-50 text-amber-800 border-amber-200' :
+            'bg-slate-50 text-slate-800 border-slate-200'
+          }">${c.importancia}</span>
+        </td>
+        <td class="py-2.5 px-3 text-xs text-slate-600 italic">&ldquo;${c.comentarios || 'Sin comentarios adicionales'}&rdquo;</td>
+      </tr>
+    `).join('');
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html lang="es">
+      <head>
+        <meta charset="UTF-8">
+        <title>Reporte de Planificación - ${plan.macrociclo}</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <style>
+          @media print {
+            .no-print { display: none !important; }
+            .page-break-inside-avoid { page-break-inside: avoid; }
+            body { background: white; color: black; }
+          }
+          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap');
+          body { font-family: 'Inter', sans-serif; }
+          .font-mono { font-family: 'JetBrains Mono', monospace; }
+        </style>
+      </head>
+      <body class="bg-slate-50 p-4 md:p-12 text-slate-800 antialiased">
+        <div class="max-w-4xl mx-auto space-y-8 bg-white p-8 border border-slate-200 rounded-2xl shadow-xs print:border-0 print:shadow-none print:p-0">
+          
+          <!-- Botonera superior de ayuda No-print -->
+          <div class="no-print bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center justify-between">
+            <div class="space-y-0.5">
+              <p class="text-xs font-black text-amber-900">Vista Previa de Impresión Habilitada</p>
+              <p class="text-[11px] text-amber-700">Se ha configurado la maquetación optimizada para impresión física o guardado en formato PDF.</p>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="window.print()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-lg uppercase tracking-wider transition cursor-pointer">
+                🖨️ Imprimir / Guardar PDF
+              </button>
+              <button onclick="window.close()" class="px-3 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 font-bold text-xs rounded-lg uppercase tracking-wider transition cursor-pointer">
+                Cerrar Ventana
+              </button>
+            </div>
+          </div>
+
+          <!-- Header Impresión -->
+          <div class="flex justify-between items-start border-b-2 border-slate-900 pb-5">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="w-3 h-3 rounded-full bg-indigo-600"></span>
+                <span class="text-[10px] font-extrabold text-indigo-600 tracking-wider font-mono uppercase">SISDEP - ARCHERY APP</span>
+              </div>
+              <h1 class="text-2xl font-black text-slate-950 tracking-tight uppercase">${plan.macrociclo}</h1>
+              <p class="text-xs text-slate-500 font-extrabold uppercase tracking-widest">Planificación Anual de Periodización y Rendimiento</p>
+            </div>
+            <div class="text-right">
+              <span class="bg-slate-100 border border-slate-200 text-slate-800 text-[10px] font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider">
+                🧭 ${plan.temporada || 'Temporada general'}
+              </span>
+              <p class="text-[9px] text-slate-400 font-mono mt-1.5">REGISTRO: #${plan.id}</p>
+            </div>
+          </div>
+
+          <!-- Datos de Contexto -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-4 border border-slate-200 rounded-xl">
+            <div>
+              <span class="block text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mb-0.5">Asignación Directa</span>
+              <span class="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                ${plan.tipo === 'grupo' ? '👥' : '🎯'} ${nombreAsignado}
+              </span>
+            </div>
+            <div>
+              <span class="block text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mb-0.5">Vigencia del Ciclo</span>
+              <span class="text-xs font-bold text-slate-700 font-mono">
+                📅 ${plan.fecha_inicio || '---'} al ${plan.fecha_fin || '---'}
+              </span>
+            </div>
+            <div>
+              <span class="block text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mb-0.5">Tipo de Ficha</span>
+              <span class="text-xs font-black text-indigo-700 uppercase">
+                MACROCICLO Y PERIODIZACIÓN
+              </span>
+            </div>
+          </div>
+
+          <!-- Objetivos del Macrociclo -->
+          ${plan.objetivos_macrociclo ? `
+            <div class="space-y-2">
+              <h3 class="text-xs font-black text-slate-900 uppercase tracking-widest border-l-4 border-indigo-600 pl-2">
+                Objetivos del Macrociclo (Técnicos, Físicos y de Rendimiento)
+              </h3>
+              <p class="text-xs text-slate-600 leading-relaxed bg-slate-50 p-4 border border-dashed rounded-xl italic font-medium">
+                &ldquo;${plan.objetivos_macrociclo}&rdquo;
+              </p>
+            </div>
+          ` : ''}
+
+          <!-- Mesociclos Detallados -->
+          <div class="space-y-4">
+            <h3 class="text-xs font-black text-slate-900 uppercase tracking-widest border-l-4 border-indigo-600 pl-2">
+              Estructura Operativa (Mesociclos y Periodos de Carga)
+            </h3>
+            <div class="space-y-4 pt-1">
+              ${mesociclosHTML || '<p class="text-xs text-slate-400 italic text-center py-6">No hay mesociclos ni microciclos programados en este macrociclo.</p>'}
+            </div>
+          </div>
+
+          <!-- Calendario Competitivo -->
+          <div class="space-y-3 page-break-inside-avoid">
+            <h3 class="text-xs font-black text-slate-900 uppercase tracking-widest border-l-4 border-indigo-600 pl-2">
+              Calendario de Competiciones Planificadas
+            </h3>
+            ${(plan.competiciones || []).length === 0 ? `
+              <p class="text-xs text-slate-400 italic py-4 text-center border border-dashed rounded-xl bg-slate-50">No hay competiciones programadas en este macrociclo todavía.</p>
+            ` : `
+              <div class="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs">
+                <table class="w-full text-left border-collapse">
+                  <thead>
+                    <tr class="bg-indigo-950 text-white font-extrabold text-[10px] uppercase">
+                      <th class="py-2.5 px-3">Competición / Evento</th>
+                      <th class="py-2.5 px-3">Fecha</th>
+                      <th class="py-2.5 px-3">Importancia / Nivel</th>
+                      <th class="py-2.5 px-3">Objetivos / Comentarios</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${competicionesHTML}
+                  </tbody>
+                </table>
+              </div>
+            `}
+          </div>
+
+          <!-- Firmas / Bloque de Validación -->
+          <div class="pt-8 border-t border-slate-200 grid grid-cols-2 gap-8 page-break-inside-avoid">
+            <div>
+              <span class="block text-[9px] font-extrabold text-slate-400 uppercase tracking-widest mb-16">Firma del Técnico Principal</span>
+              <div class="border-t border-slate-400 w-48 pt-1">
+                <p class="text-xs font-black text-slate-800">Francisco J. Antón</p>
+                <p class="text-[9px] text-slate-400 font-bold uppercase">Entrenador y Director Técnico</p>
+              </div>
+            </div>
+            <div class="text-right flex flex-col justify-end items-end space-y-2">
+              <p class="text-[9px] text-slate-400 font-mono">Generado el ${new Date().toLocaleDateString('es-ES')} a las ${new Date().toLocaleTimeString('es-ES')}</p>
+              <button onclick="window.print()" class="no-print px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-lg uppercase tracking-wider transition shadow-sm cursor-pointer">
+                Confirmar Impresión 🖨️
+              </button>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="no-print text-center my-8">
+          <button onclick="window.print()" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-xl uppercase tracking-wider transition shadow-md cursor-pointer inline-flex items-center gap-2">
+            🖨️ Lanzar Cuadro de Impresión / Guardar PDF
+          </button>
+          <button onclick="window.close()" class="ml-2 px-5 py-3 border border-slate-200 bg-white text-slate-500 font-bold hover:bg-slate-55 text-xs rounded-xl uppercase tracking-wider transition cursor-pointer">
+            Cerrar Ventana
+          </button>
+        </div>
+
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.print();
+            }, 600);
+          };
+        </script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   // Formulario de Mesociclo nuevo
   const [mesoNombre, setMesoNombre] = useState('');
   const [mesoTipo, setMesoTipo] = useState('Preparatorio');
@@ -1553,20 +1821,96 @@ export default function TecnicoDashboard({
 
                 {/* Listado de Macrociclos Activos */}
                 <div className="lg:col-span-7 bg-white border border-slate-100 p-5 rounded-xl shadow-sm space-y-4">
-                  <h3 className="text-md font-bold text-slate-800">
-                    Sistemas de Planificación Anual
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    Selecciona uno de los macrociclos listados para diseñar detalladamente la periodización de mesociclos, microciclos y su calendario competitivo asociado.
-                  </p>
+                  <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 border-b border-slate-100 pb-3">
+                    <div className="space-y-1">
+                      <h3 className="text-md font-bold text-slate-800">
+                        Sistemas de Planificación Anual
+                      </h3>
+                      <p className="text-xs text-slate-400">
+                        Selecciona uno de los macrociclos listados para diseñar detalladamente la periodización de mesociclos, microciclos y su calendario competitivo asociado.
+                      </p>
+                    </div>
+                    {/* Barra de Filtros Avanzada */}
+                    <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                      {/* Filtro por temporada */}
+                      <div className="flex items-center gap-1.5">
+                        <label htmlFor="filtro-temporada" className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">
+                          Temp:
+                        </label>
+                        <select
+                          id="filtro-temporada"
+                          value={filterTemporada}
+                          onChange={(e) => setFilterTemporada(e.target.value)}
+                          className="text-xs bg-slate-50 border border-slate-200 rounded-lg p-1.5 font-bold text-slate-700 outline-none hover:bg-slate-100 transition cursor-pointer"
+                        >
+                          <option value="todos">Todas</option>
+                          {temporadasDisponibles.map((temp) => (
+                            <option key={temp} value={temp}>
+                              {temp}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Filtro por Tipo */}
+                      <div className="flex items-center gap-1.5">
+                        <label htmlFor="filtro-tipo" className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">
+                          Tipo:
+                        </label>
+                        <select
+                          id="filtro-tipo"
+                          value={filterTipo}
+                          onChange={(e) => {
+                            setFilterTipo(e.target.value);
+                            if (e.target.value !== 'individual') {
+                              setFilterArqueroId('todos');
+                            }
+                          }}
+                          className="text-xs bg-slate-50 border border-slate-200 rounded-lg p-1.5 font-bold text-slate-700 outline-none hover:bg-slate-100 transition cursor-pointer"
+                        >
+                          <option value="todos">Todos</option>
+                          <option value="grupo">Grupal 👥</option>
+                          <option value="individual">Individual 🎯</option>
+                        </select>
+                      </div>
+
+                      {/* Filtro por Arquero (Condicional) */}
+                      {filterTipo === 'individual' && (
+                        <div className="flex items-center gap-1.5 min-w-[120px]">
+                          <label htmlFor="filtro-arquero" className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">
+                            Arquero:
+                          </label>
+                          <select
+                            id="filtro-arquero"
+                            value={filterArqueroId}
+                            onChange={(e) => setFilterArqueroId(e.target.value)}
+                            className="text-xs bg-slate-50 border border-slate-200 rounded-lg p-1.5 font-bold text-slate-700 outline-none hover:bg-slate-100 transition cursor-pointer max-w-[160px]"
+                          >
+                            <option value="todos">Todos</option>
+                            {usuariosList
+                              .filter((u) => u.rol === 'arquero')
+                              .map((u) => (
+                                <option key={u.id_usuario} value={u.id_usuario}>
+                                  {u.nombre} {u.apellidos}
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                   
                   <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
                     {planificaciones.length === 0 ? (
                       <p className="text-xs text-slate-400 italic text-center py-10 border border-dashed rounded-xl bg-slate-25">
                         No se han guardado planificaciones. Crea una en el panel izquierdo para comenzar.
                       </p>
+                    ) : planificacionesFiltradas.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic text-center py-10 border border-dashed rounded-xl bg-slate-25">
+                        No existen planificaciones para los filtros seleccionados (Temporada: {filterTemporada === 'todos' ? 'Todas' : filterTemporada}, Tipo: {filterTipo === 'todos' ? 'Todos' : filterTipo === 'grupo' ? 'Grupal' : 'Individual'}).
+                      </p>
                     ) : (
-                      planificaciones.map((p) => {
+                      planificacionesFiltradas.map((p) => {
                         const totalMesos = p.mesociclos_lista?.length || 0;
                         const totalComps = p.competiciones?.length || 0;
                         return (
@@ -1727,7 +2071,16 @@ export default function TecnicoDashboard({
                         </p>
                       </div>
 
-                      <div className="flex gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          onClick={() => imprimirPlanificacionDetallada(selectedPlan)}
+                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-2 shadow-sm cursor-pointer"
+                          title="Imprimir o guardar como PDF la planificación anual completa"
+                        >
+                          <Printer size={14} />
+                          Imprimir Planificación 🖨️
+                        </button>
+
                         <button
                           onClick={() => {
                             pedirConfirmacion(
@@ -1739,7 +2092,7 @@ export default function TecnicoDashboard({
                               }
                             );
                           }}
-                          className="px-3 py-1.5 border border-red-500/30 text-red-400 hover:text-white hover:bg-red-600 rounded-lg text-xs font-bold transition"
+                          className="px-3 py-1.5 border border-red-500/30 text-red-400 hover:text-white hover:bg-red-600 rounded-lg text-xs font-bold transition cursor-pointer"
                         >
                           Eliminar Planificación
                         </button>

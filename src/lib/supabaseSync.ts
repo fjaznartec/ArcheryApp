@@ -207,7 +207,10 @@ export async function pushAllToSupabase(localData: {
       serie: i.serie,
       tanda: i.tanda,
       flecha_index: i.flecha_index,
-      valor_impacto: i.valor_impacto
+      valor_impacto: i.valor_impacto,
+      x: i.x || null,
+      y: i.y || null,
+      spot: i.spot || null
     }));
     results.impactos_flechas = await pushToSupabase('impactos_flechas', formattedImpactos);
 
@@ -402,17 +405,20 @@ export async function pullFromSupabase() {
       }));
     }
 
-    // Fetch impactos_flechas
-    const { data: dbImpactos } = await supabase.from('impactos_flechas').select('*');
-    if (dbImpactos) {
-      data.impactos = dbImpactos.map(i => ({
-        id_control: i.id_control,
-        serie: i.serie,
-        tanda: i.tanda,
-        flecha_index: i.flecha_index,
-        valor_impacto: i.valor_impacto
-      }));
-    }
+     // Fetch impactos_flechas
+     const { data: dbImpactos } = await supabase.from('impactos_flechas').select('*');
+     if (dbImpactos) {
+       data.impactos = dbImpactos.map(i => ({
+         id_control: i.id_control,
+         serie: i.serie,
+         tanda: i.tanda,
+         flecha_index: i.flecha_index,
+         valor_impacto: i.valor_impacto,
+         x: i.x,
+         y: i.y,
+         spot: i.spot
+       }));
+     }
 
     return { success: true, data };
   } catch (err : any) {
