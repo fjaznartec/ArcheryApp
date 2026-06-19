@@ -20,7 +20,7 @@ if (supabaseUrl.endsWith('/rest/v1/')) {
   supabaseUrl = supabaseUrl.slice(0, -8);
 }
 
-const supabaseAnonKey = getEnvValue(rawKey, 'sb_publishable_xRvNrxwqhLAIApmzz8Ditg_W3-Oajzi');
+const supabaseAnonKey = getEnvValue(rawKey, 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJjanpob2hicmt2eWFvandvZ3ZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwMTYwNTMsImV4cCI6MjA5NjU5MjA1M30._k_VQEd1X73VBxxb90bgJs3Ow68e3PpJUrBAEaAeCk8');
 
 // final fallback confirmation for safety
 const finalUrl = supabaseUrl.startsWith('http') ? supabaseUrl : 'https://bcjzhohbrkvyaojwogvk.supabase.co';
