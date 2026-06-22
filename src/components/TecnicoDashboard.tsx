@@ -156,7 +156,7 @@ export default function TecnicoDashboard({
       const microciclosHTML = (meso.microciclos || []).map((micro) => `
         <tr class="border-b border-gray-100 hover:bg-slate-50/50">
           <td class="py-2.5 px-3 font-bold text-slate-800 text-xs">${micro.nombre}</td>
-          <td class="py-2.5 px-3 text-slate-600 text-xs font-semibold">${micro.fechas}</td>
+          <td class="py-2.5 px-3 text-slate-600 text-xs font-semibold">${micro.fechas}${micro.fecha_inicio && micro.fecha_fin ? `<br/><span class="text-[9px] text-indigo-600 bg-indigo-50 font-bold px-1.5 py-0.5 rounded border border-indigo-100/60">${micro.fecha_inicio} al ${micro.fecha_fin}</span>` : ''}</td>
           <td class="py-2.5 px-3 text-slate-700 text-xs font-mono font-bold">${micro.volumen_flechas ? `${micro.volumen_flechas} flechas` : '---'}</td>
           <td class="py-2.5 px-3 text-indigo-700 font-bold text-xs">${micro.enfoque_principal}</td>
           <td class="py-2.5 px-3 text-slate-600 text-xs">${micro.objetivos || '---'}</td>
@@ -173,6 +173,11 @@ export default function TecnicoDashboard({
             <span class="text-xs text-slate-500 font-bold">📅 Periodo: ${meso.fecha_inicio} al ${meso.fecha_fin}</span>
           </div>
           <div class="p-3">
+            ${meso.objetivos ? `
+              <div class="mb-3 p-2.5 bg-indigo-50/45 border-l-2 border-indigo-500 rounded-r text-[11px] text-slate-700">
+                <span class="text-[9px] font-extrabold uppercase text-indigo-700 tracking-wider">Objetivos del Mesociclo:</span> ${meso.objetivos}
+              </div>
+            ` : ''}
             ${(meso.microciclos || []).length === 0 ? `
               <p class="text-xs text-slate-400 italic py-3 text-center">No hay microciclos configurados en este periodo.</p>
             ` : `
@@ -382,12 +387,15 @@ export default function TecnicoDashboard({
   const [mesoTipo, setMesoTipo] = useState('Preparatorio');
   const [mesoInicio, setMesoInicio] = useState('2026-06-01');
   const [mesoFin, setMesoFin] = useState('2026-06-30');
+  const [mesoObjetivos, setMesoObjetivos] = useState('');
   const [isAddingMeso, setIsAddingMeso] = useState(false);
 
   // Formulario de Microciclo nuevo
   const [addingMicroForMesoId, setAddingMicroForMesoId] = useState<string | null>(null);
   const [microNombre, setMicroNombre] = useState('');
   const [microFechas, setMicroFechas] = useState('');
+  const [microFechaInicio, setMicroFechaInicio] = useState('');
+  const [microFechaFin, setMicroFechaFin] = useState('');
   const [microVolumen, setMicroVolumen] = useState<number>(300);
   const [microEnfoque, setMicroEnfoque] = useState('Técnica de anclaje');
   const [microObjetivo, setMicroObjetivo] = useState('');
@@ -413,10 +421,13 @@ export default function TecnicoDashboard({
   const [editingMesoTipo, setEditingMesoTipo] = useState('Preparatorio');
   const [editingMesoInicio, setEditingMesoInicio] = useState('2026-06-01');
   const [editingMesoFin, setEditingMesoFin] = useState('2026-06-30');
+  const [editingMesoObjetivos, setEditingMesoObjetivos] = useState('');
 
   const [editingMicroId, setEditingMicroId] = useState<string | null>(null);
   const [editingMicroNombre, setEditingMicroNombre] = useState('');
   const [editingMicroFechas, setEditingMicroFechas] = useState('');
+  const [editingMicroFechaInicio, setEditingMicroFechaInicio] = useState('');
+  const [editingMicroFechaFin, setEditingMicroFechaFin] = useState('');
   const [editingMicroVolumen, setEditingMicroVolumen] = useState<number>(300);
   const [editingMicroEnfoque, setEditingMicroEnfoque] = useState('Técnica de anclaje');
   const [editingMicroObjetivo, setEditingMicroObjetivo] = useState('');
@@ -622,6 +633,7 @@ export default function TecnicoDashboard({
       tipo_mesociclo: mesoTipo,
       fecha_inicio: mesoInicio,
       fecha_fin: mesoFin,
+      objetivos: mesoObjetivos,
       microciclos: []
     };
 
@@ -635,6 +647,7 @@ export default function TecnicoDashboard({
     
     // Reset form
     setMesoNombre('');
+    setMesoObjetivos('');
     setIsAddingMeso(false);
   };
 
@@ -659,6 +672,7 @@ export default function TecnicoDashboard({
     setEditingMesoTipo(meso.tipo_mesociclo);
     setEditingMesoInicio(meso.fecha_inicio);
     setEditingMesoFin(meso.fecha_fin);
+    setEditingMesoObjetivos(meso.objetivos || '');
   };
 
   const handleCancelEditMeso = () => {
@@ -667,6 +681,7 @@ export default function TecnicoDashboard({
     setEditingMesoTipo('Preparatorio');
     setEditingMesoInicio('2026-06-01');
     setEditingMesoFin('2026-06-30');
+    setEditingMesoObjetivos('');
   };
 
   const handleUpdateMesociclo = (planId: string) => {
@@ -685,7 +700,8 @@ export default function TecnicoDashboard({
           nombre: editingMesoNombre,
           tipo_mesociclo: editingMesoTipo,
           fecha_inicio: editingMesoInicio,
-          fecha_fin: editingMesoFin
+          fecha_fin: editingMesoFin,
+          objetivos: editingMesoObjetivos
         };
       }
       return m;
@@ -715,6 +731,8 @@ export default function TecnicoDashboard({
       id: 'micro-' + Date.now(),
       nombre: microNombre,
       fechas: microFechas || "Semana regular",
+      fecha_inicio: microFechaInicio,
+      fecha_fin: microFechaFin,
       volumen_flechas: microVolumen,
       enfoque_principal: microEnfoque,
       objetivos: microObjetivo
@@ -740,6 +758,8 @@ export default function TecnicoDashboard({
     // Reset Form
     setMicroNombre('');
     setMicroFechas('');
+    setMicroFechaInicio('');
+    setMicroFechaFin('');
     setMicroObjetivo('');
     setAddingMicroForMesoId(null);
   };
@@ -772,6 +792,8 @@ export default function TecnicoDashboard({
     setEditingMicroId(micro.id);
     setEditingMicroNombre(micro.nombre);
     setEditingMicroFechas(micro.fechas);
+    setEditingMicroFechaInicio(micro.fecha_inicio || '');
+    setEditingMicroFechaFin(micro.fecha_fin || '');
     setEditingMicroVolumen(micro.volumen_flechas);
     setEditingMicroEnfoque(micro.enfoque_principal);
     setEditingMicroObjetivo(micro.objetivos);
@@ -781,6 +803,8 @@ export default function TecnicoDashboard({
     setEditingMicroId(null);
     setEditingMicroNombre('');
     setEditingMicroFechas('');
+    setEditingMicroFechaInicio('');
+    setEditingMicroFechaFin('');
     setEditingMicroVolumen(300);
     setEditingMicroEnfoque('Técnica de anclaje');
     setEditingMicroObjetivo('');
@@ -802,6 +826,8 @@ export default function TecnicoDashboard({
             ...mic,
             nombre: editingMicroNombre,
             fechas: editingMicroFechas || "Semana regular",
+            fecha_inicio: editingMicroFechaInicio,
+            fecha_fin: editingMicroFechaFin,
             volumen_flechas: editingMicroVolumen,
             enfoque_principal: editingMicroEnfoque,
             objetivos: editingMicroObjetivo
@@ -2168,6 +2194,15 @@ export default function TecnicoDashboard({
                                 />
                               </div>
                             </div>
+                            <div>
+                              <label className="block text-[9px] font-extrabold text-slate-400 uppercase mb-1">Objetivos del Mesociclo</label>
+                              <textarea
+                                value={mesoObjetivos}
+                                onChange={(e) => setMesoObjetivos(e.target.value)}
+                                className="w-full text-xs p-2 bg-white border rounded-lg h-16 resize-none"
+                                placeholder="e.g. Consolidar el volumen técnico con un enfoque en la regularidad y el desarrollo de fuerza."
+                              />
+                            </div>
                             <button
                               type="button"
                               onClick={() => handleAddMesociclo(selectedPlan.id)}
@@ -2215,6 +2250,15 @@ export default function TecnicoDashboard({
                                           value={editingMesoNombre}
                                           onChange={(e) => setEditingMesoNombre(e.target.value)}
                                           className="w-full text-xs p-1 border rounded focus:outline-indigo-600"
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="block text-[8px] font-bold text-slate-400 uppercase">Objetivos del Mesociclo</label>
+                                        <textarea
+                                          value={editingMesoObjetivos}
+                                          onChange={(e) => setEditingMesoObjetivos(e.target.value)}
+                                          className="w-full text-xs p-1 border rounded h-12 bg-white resize-none focus:outline-indigo-600"
+                                          placeholder="Objetivos del mesociclo..."
                                         />
                                       </div>
                                       <div className="grid grid-cols-3 gap-1.5">
@@ -2281,6 +2325,11 @@ export default function TecnicoDashboard({
                                     <p className="text-[10px] text-slate-400 font-bold">
                                       📅 {meso.fecha_inicio} a {meso.fecha_fin}
                                     </p>
+                                    {meso.objetivos && (
+                                      <p className="text-[11px] text-slate-650 bg-indigo-50/50 border-l-2 border-indigo-400 p-2 rounded-r-md mt-2 font-medium text-justify">
+                                        🎯 <strong className="font-extrabold tracking-tight uppercase text-[9px] text-indigo-600 block mb-0.5">Objetivos:</strong> {meso.objetivos}
+                                      </p>
+                                    )}
                                   </div>
                                 )}
 
@@ -2323,6 +2372,26 @@ export default function TecnicoDashboard({
                                             className="w-full text-xs p-1 px-2 border rounded"
                                             placeholder="e.g. Semana 15 Jun - 21 Jun"
                                           />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                          <div>
+                                            <label className="block text-[8px] font-extrabold text-slate-400 uppercase">F. Inicio 📅</label>
+                                            <input
+                                              type="date"
+                                              value={microFechaInicio}
+                                              onChange={(e) => setMicroFechaInicio(e.target.value)}
+                                              className="w-full text-xs p-1 px-2 border rounded"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-[8px] font-extrabold text-slate-400 uppercase">F. Fin 📅</label>
+                                            <input
+                                              type="date"
+                                              value={microFechaFin}
+                                              onChange={(e) => setMicroFechaFin(e.target.value)}
+                                              className="w-full text-xs p-1 px-2 border rounded"
+                                            />
+                                          </div>
                                         </div>
                                         <div>
                                           <label className="block text-[8px] font-extrabold text-slate-400 uppercase">Volumen Flechas Estimadas</label>
@@ -2390,7 +2459,7 @@ export default function TecnicoDashboard({
                                           {editingMicroId === micro.id ? (
                                             <div className="space-y-2 text-xs pr-12 pt-1 text-slate-800">
                                               <h6 className="font-extrabold text-indigo-700 uppercase text-[9px]">Modificar Microciclo</h6>
-                                              <div className="grid grid-cols-2 gap-1.5">
+                                              <div className="grid grid-cols-2 gap-1.5 flex-wrap">
                                                 <div>
                                                   <label className="block text-[7px] text-slate-400 uppercase font-black">Nombre</label>
                                                   <input
@@ -2398,6 +2467,24 @@ export default function TecnicoDashboard({
                                                     value={editingMicroNombre}
                                                     onChange={(e) => setEditingMicroNombre(e.target.value)}
                                                     className="w-full text-[11px] p-0.5 border rounded"
+                                                  />
+                                                </div>
+                                                <div>
+                                                  <label className="block text-[7px] text-slate-400 uppercase font-black font-extrabold text-indigo-650">F. Inicio 📅</label>
+                                                  <input
+                                                    type="date"
+                                                    value={editingMicroFechaInicio}
+                                                    onChange={(e) => setEditingMicroFechaInicio(e.target.value)}
+                                                    className="w-full text-[10px] p-0.5 border border-slate-200 rounded"
+                                                  />
+                                                </div>
+                                                <div>
+                                                  <label className="block text-[7px] text-slate-400 uppercase font-black font-extrabold text-indigo-650">F. Fin 📅</label>
+                                                  <input
+                                                    type="date"
+                                                    value={editingMicroFechaFin}
+                                                    onChange={(e) => setEditingMicroFechaFin(e.target.value)}
+                                                    className="w-full text-[10px] p-0.5 border border-slate-200 rounded"
                                                   />
                                                 </div>
                                                 <div>
@@ -2464,7 +2551,7 @@ export default function TecnicoDashboard({
                                                   {micro.enfoque_principal}
                                                 </p>
                                                 <p className="text-[9px] text-slate-400 font-extrabold">
-                                                  🗓️ {micro.fechas} • 🏹 Est. {micro.volumen_flechas} flechas
+                                                  🗓️ {micro.fechas} {micro.fecha_inicio && micro.fecha_fin ? `(${micro.fecha_inicio} al ${micro.fecha_fin})` : ''} • 🏹 Est. {micro.volumen_flechas} flechas
                                                 </p>
                                                 <p className="text-[10px] text-slate-650 bg-slate-50 border-l-2 p-1.5 border-indigo-200 mt-1 uppercase font-semibold font-mono tracking-wide text-justify scale-z leading-snug">
                                                   {micro.objetivos}

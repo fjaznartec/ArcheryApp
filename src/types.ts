@@ -64,6 +64,8 @@ export interface MicrocicloPlan {
   id: string;
   nombre: string; // e.g. "Microciclo 1"
   fechas: string; // e.g. "Semana del 15 al 21"
+  fecha_inicio?: string; // e.g. "2026-06-01"
+  fecha_fin?: string; // e.g. "2026-06-07"
   volumen_flechas?: number; // e.g. 500 flechas
   enfoque_principal: string; // e.g. "Técnica - Suelta limpia"
   objetivos: string; // e.g. "Arco compuesto: Suelta limpia sin gatillar con disparador de tensión"
@@ -75,6 +77,7 @@ export interface MesocicloPlan {
   tipo_mesociclo: string; // e.g. "Preparatorio", "Competitivo", "Transición", "Desarrollo", "Estabilización"
   fecha_inicio: string;
   fecha_fin: string;
+  objetivos?: string;
   microciclos: MicrocicloPlan[];
 }
 
